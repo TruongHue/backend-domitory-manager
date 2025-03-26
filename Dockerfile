@@ -1,15 +1,17 @@
-﻿# Dùng image .NET Core chính thức
-FROM mcr.microsoft.com/dotnet/aspnet:7.0 AS base
+﻿# Sử dụng SDK .NET để build ứng dụng
+FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /app
 
-# Copy tất cả file vào container
-COPY . .
-
-# Khôi phục dependencies
+# Copy file csproj vào container và chạy restore
+COPY *.csproj ./
 RUN dotnet restore
 
-# Build project
-RUN dotnet build -c Release -o out
+# Copy toàn bộ source code vào container
+COPY . . 
+RUN dotnet publish -c Release -o /app/publish
 
-# Chạy ứng dụng
-CMD ["dotnet", "YourApp.dll"]
+# Sử dụng runtime .NET để chạy ứng dụng
+FROM mcr.microsoft.com/dotnet/aspnet:7.0 AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+ENTRYPOINT ["dotnet", "backend-domitory-manager.dll"]
