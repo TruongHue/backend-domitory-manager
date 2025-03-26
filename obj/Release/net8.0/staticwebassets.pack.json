@@ -1,0 +1,65 @@
+{
+  "Files": [
+    {
+      "Id": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\10f6d40b-bf19-4ec1-8973-6f1b81c3af56.jpg",
+      "PackagePath": "staticwebassets\\images\\10f6d40b-bf19-4ec1-8973-6f1b81c3af56.jpg"
+    },
+    {
+      "Id": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\283e8593-b527-4818-98f2-33ca6d29960c.jpg",
+      "PackagePath": "staticwebassets\\images\\283e8593-b527-4818-98f2-33ca6d29960c.jpg"
+    },
+    {
+      "Id": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\47b75ff0-6137-4c66-b09d-0418cfe1bb75.jpg",
+      "PackagePath": "staticwebassets\\images\\47b75ff0-6137-4c66-b09d-0418cfe1bb75.jpg"
+    },
+    {
+      "Id": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\4c3f3ce5-7bec-40ea-80c8-a333f61257fc.jpg",
+      "PackagePath": "staticwebassets\\images\\4c3f3ce5-7bec-40ea-80c8-a333f61257fc.jpg"
+    },
+    {
+      "Id": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\4d0537ce-065d-4629-84aa-9a49d5f7bf81.png",
+      "PackagePath": "staticwebassets\\images\\4d0537ce-065d-4629-84aa-9a49d5f7bf81.png"
+    },
+    {
+      "Id": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\5bcef592-956c-4b2f-8f92-2693cd9b3b2a.JPG",
+      "PackagePath": "staticwebassets\\images\\5bcef592-956c-4b2f-8f92-2693cd9b3b2a.JPG"
+    },
+    {
+      "Id": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\73a87c17-01b7-482c-bebe-74784235d306.jpg",
+      "PackagePath": "staticwebassets\\images\\73a87c17-01b7-482c-bebe-74784235d306.jpg"
+    },
+    {
+      "Id": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\84547d09-d342-4299-a10d-fead75631b6a.png",
+      "PackagePath": "staticwebassets\\images\\84547d09-d342-4299-a10d-fead75631b6a.png"
+    },
+    {
+      "Id": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\b85bf556-9a13-45b8-b760-d5ba40bfebd1.png",
+      "PackagePath": "staticwebassets\\images\\b85bf556-9a13-45b8-b760-d5ba40bfebd1.png"
+    },
+    {
+      "Id": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\ccc865ed-0e49-49f5-89dd-817e01695db4.png",
+      "PackagePath": "staticwebassets\\images\\ccc865ed-0e49-49f5-89dd-817e01695db4.png"
+    },
+    {
+      "Id": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\nsnstns-e1563992942620-770x402.jpg",
+      "PackagePath": "staticwebassets\\images\\nsnstns-e1563992942620-770x402.jpg"
+    },
+    {
+      "Id": "obj\\Release\\net8.0\\staticwebassets\\msbuild.API_dormitory.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj\\Release\\net8.0\\staticwebassets\\msbuild.build.API_dormitory.props",
+      "PackagePath": "build\\API_dormitory.props"
+    },
+    {
+      "Id": "obj\\Release\\net8.0\\staticwebassets\\msbuild.buildMultiTargeting.API_dormitory.props",
+      "PackagePath": "buildMultiTargeting\\API_dormitory.props"
+    },
+    {
+      "Id": "obj\\Release\\net8.0\\staticwebassets\\msbuild.buildTransitive.API_dormitory.props",
+      "PackagePath": "buildTransitive\\API_dormitory.props"
+    }
+  ],
+  "ElementsToRemove": []
+}
