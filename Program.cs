@@ -7,7 +7,6 @@ using OfficeOpenXml;
 using System.Text;
 
 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<MongoDbContext>();
