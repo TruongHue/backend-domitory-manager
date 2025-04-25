@@ -11,11 +11,9 @@ public class EmailService
 
     public EmailService()
     {
-        // Đọc tệp .env
-        Env.Load();
 
         // Lấy API key từ .env
-        string apiKey = Env.GetString("SENDINBLUE_API_KEY");
+        string apiKey = Environment.GetEnvironmentVariable("SENDINBLUE_API_KEY");
         if (string.IsNullOrEmpty(apiKey))
         {
             throw new InvalidOperationException("API key for Sendinblue is not set.");
