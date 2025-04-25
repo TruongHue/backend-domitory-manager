@@ -57,6 +57,10 @@
               "target": "Package",
               "version": "[1.27.4, )"
             },
+            "DotNetEnv": {
+              "target": "Package",
+              "version": "[3.1.1, )"
+            },
             "EPPlus": {
               "target": "Package",
               "version": "[6.2.5, )"
