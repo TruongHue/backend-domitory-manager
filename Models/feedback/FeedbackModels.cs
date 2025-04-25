@@ -1,24 +1,23 @@
-﻿using API_dormitory.Models.common;
-using API_dormitory.Models.Rooms;
-using API_dormitory.Models.Users;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+﻿using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 
-namespace API_dormitory.Models.feedback
+namespace API_dormitory.Models.Feedback
 {
     public class FeedbackModels
     {
-        [Key]
-        public int IdFeeedback { get; set; }
-        [Required]
-        [ForeignKey("InfoUser")]
-        public int IdStudent {  get; set; }
-        [Required]
-        public string Description {  get; set; }
-        [Required]
-        public PaymentStatusEnum status { get; set; }
-        public virtual InfoStudentModels InfoStudent { get; set; }
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string? Id { get; set; }
 
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string AccountId { get; set; } = null!;  // ID người gửi
+
+        public string Title { get; set; } = null!;
+        public string Sender { get; set; } = "Bạn";
+        public string Content { get; set; } = null!;
+        public string? Response { get; set; } = null;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public DateTime? ResponseAt { get; set; } = null;  // 🕒 Thời gian phản hồi
     }
-
 }

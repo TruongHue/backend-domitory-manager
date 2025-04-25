@@ -1,38 +1,29 @@
 ﻿using API_dormitory.Models.common;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+using System;
 
 namespace API_dormitory.Models.Registrations
 {
     public class RegistrationPeriodModels
     {
-        [Key]
-        [Column("idRegistrationPeriod")]
-        public int IdRegistrationPeriod { get; set; }
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string Id { get; set; } // MongoDB sử dụng ObjectId thay vì int
 
-
-
-        [Required]
-        [Column("actionDate")]
+        [BsonElement("actionDate")]
         public DateTime ActionDate { get; set; } // Ngày thực hiện thao tác
 
-        [Required]
-        [Column("startDate")]
+        [BsonElement("startDate")]
         public DateTime StartDate { get; set; } // Ngày bắt đầu đăng ký
 
-        [Required]
-        [Column("endDate")]
+        [BsonElement("endDate")]
         public DateTime EndDate { get; set; } // Ngày kết thúc đăng ký
 
-        // Thêm trạng thái học kỳ
-        [Required]
-        [Column("semesterStatus")]
-        public SemesterStatusEnum SemesterStatus { get; set; }
+        [BsonElement("semesterStatus")]
+        public SemesterStatusEnum SemesterStatus { get; set; } // Trạng thái học kỳ
 
-        [Required]
-        [Column("status")]
-        public RegistrationStatusEnum Status { get; set; } // Mở đăng ký hoặc Đóng đăng ký
+        [BsonElement("status")]
+        public RegistrationStatusEnum Status { get; set; } // Trạng thái đăng ký (Mở/Đóng)
     }
-
-
 }

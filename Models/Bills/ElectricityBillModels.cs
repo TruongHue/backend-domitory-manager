@@ -1,45 +1,44 @@
 ﻿using API_dormitory.Models.common;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 using System;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace API_dormitory.Models.Rooms
 {
     public class ElectricityBillModels
     {
-        [Key]
-        [Column("idElectricity")]
-        public int IdElectricity { get; set; }
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public ObjectId Id { get; set; }
 
-        [Required]
-        [ForeignKey("InfoRoom")]
-        [Column("idRoom")]
-        public int IdRoom { get; set; }
+        [BsonElement("idRoom")]
+        public ObjectId IdRoom { get; set; }
 
-        [Required]
-        [Column("beforeIndex")]
+
+        [BsonElement("studentCode")]
+        [BsonIgnoreIfNull] // Bỏ qua nếu giá trị là null
+        public string StudentCode { get; set; } // Cho phép null
+
+
+        [BsonElement("studentName")]
+        [BsonIgnoreIfNull] // Bỏ qua nếu giá trị là null
+        public string StudentName { get; set; } // Cho phép null
+        [BsonElement("beforeIndex")]
         public int BeforeIndex { get; set; }
 
-        [Required]
-        [Column("afterIndex")]
+        [BsonElement("afterIndex")]
         public int AfterIndex { get; set; }
-        [Required]
-        [Column("price")]
+
+        [BsonElement("price")]
         public decimal Price { get; set; }
 
-        [Required]
-        [Column("dateOfRecord")]
+        [BsonElement("dateOfRecord")]
         public DateTime DateOfRecord { get; set; }
-        [Required]
-        [Column("total")]
+
+        [BsonElement("total")]
         public decimal Total { get; set; }
 
-        [Required]
-        [Column("status")]
+        [BsonElement("status")]
         public PaymentStatusEnum Status { get; set; }
-
-        // Quan hệ: Một hóa đơn thuộc về một phòng
-        public virtual InfoRoomModels InfoRoom { get; set; }
     }
-
 }

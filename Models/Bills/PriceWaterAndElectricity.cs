@@ -1,31 +1,28 @@
-﻿using System;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+﻿using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+using System;
 
 namespace API_dormitory.Models.Bills
 {
     public class PriceWaterAndElectricity
     {
-        [Key]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int idPrice { get; set; } // ID tự động tăng
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public ObjectId Id { get; set; } // ID trong MongoDB là ObjectId
 
-        // Giá điện tiêu chuẩn
-        [Column(TypeName = "decimal(18,2)")]
-        public decimal electricityPrice { get; set; }
+        [BsonElement("electricityPrice")]
+        public decimal ElectricityPrice { get; set; } // Giá điện tiêu chuẩn
 
-        // Giá nước tiêu chuẩn
-        [Column(TypeName = "decimal(18,2)")]
-        public decimal waterPrice { get; set; }
+        [BsonElement("waterPrice")]
+        public decimal WaterPrice { get; set; } // Giá nước tiêu chuẩn
 
-        // Giới hạn tiêu thụ nước trước khi giá thay đổi (m³)
-        public int waterLimit { get; set; }
+        [BsonElement("waterLimit")]
+        public int WaterLimit { get; set; } // Giới hạn tiêu thụ nước trước khi giá thay đổi (m³)
 
-        // Giá nước khi tiêu thụ vượt mức giới hạn
-        [Column(TypeName = "decimal(18,2)")]
-        public decimal waterPriceOverLimit { get; set; }
+        [BsonElement("waterPriceOverLimit")]
+        public decimal WaterPriceOverLimit { get; set; } // Giá nước khi tiêu thụ vượt mức giới hạn
 
-        // Ngày thực hiện thao tác
+        [BsonElement("actionDate")]
         public DateTime ActionDate { get; set; } = DateTime.UtcNow; // Mặc định là ngày hiện tại
     }
 }

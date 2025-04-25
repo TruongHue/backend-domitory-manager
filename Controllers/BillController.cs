@@ -4,12 +4,17 @@ using API_dormitory.Models.common;
 using API_dormitory.Models.DTO;
 using API_dormitory.Models.DTO.Bill.BillElectricity;
 using API_dormitory.Models.DTO.Bill.BillRoom;
+using API_dormitory.Models.DTO.Bill.BillWater;
 using API_dormitory.Models.DTO.Building;
 using API_dormitory.Models.DTO.Room;
+using API_dormitory.Models.registerRoom;
 using API_dormitory.Models.Rooms;
+using API_dormitory.Models.Users;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MongoDB.Bson;
+using MongoDB.Driver;
 
 namespace API_dormitory.Controllers
 {
@@ -18,57 +23,76 @@ namespace API_dormitory.Controllers
     public class BillController : ControllerBase
     {
 
-        private readonly AppDbContext _context;
+        private readonly IMongoCollection<RoomBillModels> _roomBillCollection;
+        private readonly IMongoCollection<RegisterRoomModels> _registerRoomCollection;
+        private readonly IMongoCollection<InfoRoomModels> _roomsCollection;
+        private readonly IMongoCollection<ElectricityBillModels> _electricityBillCollection;
+        private readonly IMongoCollection<WaterBillModels> _waterBillCollection;
+        private readonly IMongoCollection<PriceWaterAndElectricity> _priceCollection;
+        private readonly EmailService _emailService;
+        private readonly IMongoCollection<InfoStudentModels> _infoStudents;
 
-        public BillController(AppDbContext context)
+        public BillController(MongoDbContext database, EmailService emailService)
         {
-            _context = context;
+            _roomBillCollection = database.GetCollection<RoomBillModels>("RoomBills");
+            _electricityBillCollection = database.GetCollection<ElectricityBillModels>("ElectricityBills");
+            _waterBillCollection = database.GetCollection<WaterBillModels>("WaterBills");
+            _roomsCollection = database.GetCollection<InfoRoomModels>("Rooms");
+            _priceCollection = database.GetCollection<PriceWaterAndElectricity>("PriceWaterAndElectricity");
+            _infoStudents = database.GetCollection<InfoStudentModels>("InfoStudents");
+            _registerRoomCollection = database.GetCollection<RegisterRoomModels>("RegisterRoom");
+            _emailService = emailService;
         }
+
 
 
         [HttpGet("Room")]
         public async Task<IActionResult> GetAllBillRooms()
         {
-            var bills = await _context.RoomBill
-                .Select(rb => new RoomBillDTO
+            var bills = await _roomBillCollection
+                .Find(_ => true) // Lấy tất cả hóa đơn phòng
+                .Project(rb => new RoomBillDTO
                 {
-                    IdRoomBill = rb.IdRoomBill,
-                    IdRoom = rb.IdRoom,
+                    IdRoomBill = rb.IdRoomBill.ToString(),
+                    IdRoom = rb.IdRoom.ToString(),
                     PriceYear = rb.PriceYear,
                     DailyPrice = rb.DailyPrice,
                     DateOfRecord = rb.DateOfRecord,
                     Status = rb.Status,
                 })
                 .ToListAsync();
+
             if (!bills.Any())
             {
                 return NoContent();
             }
+
             return Ok(bills);
         }
 
+
         [HttpGet("Room/{idRoom}")]
-        public async Task<IActionResult> GetBillByRoomId(int idRoom)
+        public async Task<IActionResult> GetBillByRoomId(string idRoom)
         {
-            var bill = await _context.RoomBill
-                .Where(rb => rb.IdRoom == idRoom) // Tìm theo IdRoom
-                .Select(rb => new RoomBillDTO
+            var bill = await _roomBillCollection
+                .Find(rb => rb.IdRoom.ToString() == idRoom) // Lọc theo IdRoom
+                .Project(rb => new RoomBillDTO
                 {
-                    IdRoomBill = rb.IdRoomBill,
-                    IdRoom = rb.IdRoom,
+                    IdRoomBill = rb.IdRoomBill.ToString(),
+                    IdRoom = rb.IdRoom.ToString(),
                     PriceYear = rb.PriceYear,
                     DailyPrice = rb.DailyPrice,
                     DateOfRecord = rb.DateOfRecord,
                     Status = rb.Status
                 })
-                .FirstOrDefaultAsync(); // Dùng FirstOrDefaultAsync() để tránh lỗi
+                .ToListAsync(); // Chuyển đổi thành danh sách bất đồng bộ
 
-            if (bill == null)
+            if (bill == null || bill.Count == 0)
             {
-                return NoContent(); // Trả về 204 nếu không có dữ liệu
+                return NoContent(); // Trả về 204 nếu không tìm thấy hóa đơn nào
             }
 
-            return Ok(bill);
+            return Ok(bill); // Trả về danh sách hóa đơn của phòng
         }
 
 
@@ -81,35 +105,39 @@ namespace API_dormitory.Controllers
                 return BadRequest("Dữ liệu hóa đơn phòng không hợp lệ.");
             }
 
-            var room = await _context.InfoRoom.FindAsync(roomBillDto.IdRoom);
+
+            // Kiểm tra phòng có tồn tại không
+            var room = await _roomsCollection.Find(r => r.IdRoom.ToString() == roomBillDto.IdRoom).FirstOrDefaultAsync();
             if (room == null)
             {
                 return NotFound($"Không tìm thấy phòng có ID {roomBillDto.IdRoom}.");
             }
 
-            // Lấy danh sách hóa đơn có trạng thái Active của phòng này
-            var activeBills = _context.RoomBill.Where(rb => rb.IdRoom == roomBillDto.IdRoom && rb.Status == OperatingStatusEnum.active);
+            // Tìm tất cả các hóa đơn Active của phòng đó và cập nhật thành Inactive
+            var roomId = ObjectId.Parse(roomBillDto.IdRoom); // Chuyển string thành ObjectId
+            var filter = Builders<RoomBillModels>.Filter.Eq(rb => rb.IdRoom, roomId) &
+                         Builders<RoomBillModels>.Filter.Eq(rb => rb.Status, OperatingStatusEnum.active);
 
-            // Cập nhật tất cả hóa đơn Active thành Inactive
-            foreach (var bill in activeBills)
-            {
-                bill.Status = OperatingStatusEnum.inactive;
-            }
+            var update = Builders<RoomBillModels>.Update.Set(rb => rb.Status, OperatingStatusEnum.inactive);
+            await _roomBillCollection.UpdateManyAsync(filter, update);
 
             // Thêm hóa đơn mới với trạng thái Active
             var newRoomBill = new RoomBillModels
             {
-                IdRoom = roomBillDto.IdRoom,
-                //Price = roomBillDto.Price,
+                IdRoomBill = ObjectId.GenerateNewId(),
+                IdRoom = ObjectId.Parse(roomBillDto.IdRoom),
+                DailyPrice = roomBillDto.DailyPrice,
+                PriceYear = roomBillDto.PriceYear,
                 DateOfRecord = roomBillDto.DateOfRecord,
                 Status = OperatingStatusEnum.active,
             };
 
-            _context.RoomBill.Add(newRoomBill);
-            await _context.SaveChangesAsync();
+            await _roomBillCollection.InsertOneAsync(newRoomBill);
 
-            return Ok("Thêm hóa đơn phòng thành công!");
+            return Ok(new { Message = "Thêm hóa đơn phòng thành công!", NewBill = newRoomBill });
         }
+
+
 
         [HttpPost("price/add-or-update-price")]
         public async Task<IActionResult> AddOrUpdatePrice([FromBody] PriceWaterAndElectricity request)
@@ -119,287 +147,685 @@ namespace API_dormitory.Controllers
                 return BadRequest("Dữ liệu đầu vào không hợp lệ.");
             }
 
-            // Tạo mới một bản ghi với thời gian hiện tại
+            if (_priceCollection == null)
+            {
+                return StatusCode(500, "Lỗi kết nối cơ sở dữ liệu.");
+            }
+
+            // Tạo một bản ghi mới với thời gian hiện tại
             var newPrice = new PriceWaterAndElectricity
             {
-                electricityPrice = request.electricityPrice,
-                waterPrice = request.waterPrice,
-                waterLimit = request.waterLimit,
-                waterPriceOverLimit = request.waterPriceOverLimit,
+                ElectricityPrice = request.ElectricityPrice,
+                WaterPrice = request.WaterPrice,
+                WaterLimit = request.WaterLimit,
+                WaterPriceOverLimit = request.WaterPriceOverLimit,
                 ActionDate = DateTime.UtcNow // Lưu thời gian thực hiện thao tác
             };
 
-            // Thêm vào CSDL
-            _context.PriceWaterAndElectricities.Add(newPrice);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { Message = "Thêm bảng giá điện nước thành công!", Price = newPrice });
+            try
+            {
+                await _priceCollection.InsertOneAsync(newPrice);
+                return Ok(new { Message = "Thêm bảng giá điện nước thành công!" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi khi thêm giá điện nước: {ex.Message}");
+            }
         }
-
 
         [HttpGet("price")]
         public async Task<IActionResult> GetAllPrices()
         {
-            var prices = await _context.PriceWaterAndElectricities.ToListAsync();
+            var prices = await _priceCollection.Find(_ => true)
+                .Project(p => new
+                {
+                    Id = p.Id.ToString(), // Chuyển ObjectId thành string
+                    ElectricityPrice = p.ElectricityPrice,
+                    WaterPrice = p.WaterPrice,
+                    WaterLimit = p.WaterLimit,
+                    WaterPriceOverLimit = p.WaterPriceOverLimit,
+                    ActionDate = p.ActionDate
+                })
+                .ToListAsync();
+
             return Ok(prices);
         }
 
-        [HttpDelete("price/{id}")]
-        public async Task<IActionResult> DeletePrice(int id)
+
+        [HttpGet("price/latest")]
+        public async Task<IActionResult> GetLatestPrice()
         {
-            var price = await _context.PriceWaterAndElectricities.FindAsync(id);
-            if (price == null)
-            {
-                return NotFound("Không tìm thấy bảng giá.");
-            }
-
-            _context.PriceWaterAndElectricities.Remove(price);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { Message = "Xóa bảng giá thành công!" });
-        }
-
-        [HttpPost("electricity/add-electricity-bill")]
-        public async Task<IActionResult> AddElectricityBill(AddBillElectricityDTO request)
-        {
-            var room = await _context.InfoRoom.FindAsync(request.IdRoom);
-            if (room == null)
-            {
-                return NotFound("Phòng không tồn tại.");
-            }
-
-            var latestBill = await _context.ElectricityBill
-                .Where(b => b.IdRoom == request.IdRoom)
-                .OrderByDescending(b => b.DateOfRecord)
+            var latestPrice = await _priceCollection
+                .Find(_ => true)
+                .SortByDescending(p => p.ActionDate) // Sắp xếp theo thời gian mới nhất
+                .Limit(1)
                 .FirstOrDefaultAsync();
 
-            int beforeIndex = latestBill != null ? latestBill.AfterIndex : 0;
-            int consumption = request.AfterIndex - beforeIndex;
-
-            var priceConfig = await _context.PriceWaterAndElectricities
-                .OrderByDescending(p => p.idPrice)
-                .FirstOrDefaultAsync();
-            if (priceConfig == null)
+            if (latestPrice == null)
             {
-                return BadRequest("Chưa thiết lập giá điện.");
+                return NotFound("Không có dữ liệu giá điện nước.");
             }
 
-            decimal totalPrice = consumption * priceConfig.electricityPrice;
-
-
-
-            var bill = new ElectricityBillModels
+            // Trả về ID dưới dạng string
+            var response = new
             {
-                IdRoom = request.IdRoom,
-                BeforeIndex = beforeIndex,
-                AfterIndex = request.AfterIndex,
-                Price = priceConfig.electricityPrice,
-                DateOfRecord = DateTime.UtcNow,
-                Total = Convert.ToInt32(totalPrice),
-                Status = PaymentStatusEnum.unpaid,
+                Id = latestPrice.Id.ToString(),
+                ElectricityPrice = latestPrice.ElectricityPrice,
+                WaterPrice = latestPrice.WaterPrice,
+                WaterLimit = latestPrice.WaterLimit,
+                WaterPriceOverLimit = latestPrice.WaterPriceOverLimit,
+                ActionDate = latestPrice.ActionDate
             };
 
-            _context.ElectricityBill.Add(bill);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { Message = "Thêm hóa đơn điện thành công!", Bill = bill });
+            return Ok(response);
         }
 
-        [HttpPost("water/add-water-bill")]
-        public async Task<IActionResult> AddWaterBill(AddBillElectricityDTO request)
+
+        [HttpPut("price/update-latest")]
+        public async Task<IActionResult> UpdateLatestPrice([FromBody] PriceWaterAndElectricity updatedPrice)
         {
-            var room = await _context.InfoRoom.FindAsync(request.IdRoom);
-            if (room == null)
+            if (updatedPrice == null)
             {
-                return NotFound("Phòng không tồn tại.");
+                return BadRequest("Dữ liệu cập nhật không hợp lệ.");
             }
 
-            var latestBill = await _context.WaterBill
-                .Where(b => b.IdRoom == request.IdRoom)
-                .OrderByDescending(b => b.DateOfRecord)
+            var latestPrice = await _priceCollection
+                .Find(_ => true)
+                .SortByDescending(p => p.ActionDate)
+                .Limit(1)
                 .FirstOrDefaultAsync();
 
-            int beforeIndex = latestBill != null ? latestBill.AfterIndex : 0;
-            int consumption = request.AfterIndex - beforeIndex;
+            if (latestPrice == null)
+            {
+                return NotFound("Không có dữ liệu giá điện nước để cập nhật.");
+            }
 
-            var priceConfig = await _context.PriceWaterAndElectricities
-                .OrderByDescending(p => p.idPrice)
+            var filter = Builders<PriceWaterAndElectricity>.Filter.Eq(p => p.Id, latestPrice.Id);
+            var update = Builders<PriceWaterAndElectricity>.Update
+                .Set(p => p.ElectricityPrice, updatedPrice.ElectricityPrice)
+                .Set(p => p.WaterPrice, updatedPrice.WaterPrice)
+                .Set(p => p.WaterLimit, updatedPrice.WaterLimit)
+                .Set(p => p.WaterPriceOverLimit, updatedPrice.WaterPriceOverLimit)
+                .Set(p => p.ActionDate, DateTime.UtcNow);
+
+            var result = await _priceCollection.UpdateOneAsync(filter, update);
+
+            if (result.ModifiedCount == 0)
+            {
+                return StatusCode(500, "Cập nhật giá điện nước không thành công.");
+            }
+
+            return Ok(new { Message = "Cập nhật giá điện nước thành công!", UpdatedPrice = updatedPrice });
+        }
+
+        [HttpDelete("price/{id}")]
+        public async Task<IActionResult> DeletePriceById(string id)
+        {
+            if (!ObjectId.TryParse(id, out var objectId))
+            {
+                return BadRequest("ID không hợp lệ.");
+            }
+
+            var result = await _priceCollection.DeleteOneAsync(p => p.Id == objectId);
+
+            if (result.DeletedCount == 0)
+            {
+                return NotFound("Không tìm thấy bản ghi giá điện nước để xóa.");
+            }
+
+            return Ok(new { Message = "Xóa giá điện nước thành công!", DeletedId = id });
+        }
+
+
+        [HttpGet("room/{roomId}")]
+        public async Task<IActionResult> GetRoomBillByRoomId(string roomId)
+        {
+            if (!ObjectId.TryParse(roomId, out ObjectId objectIdRoom))
+            {
+                return BadRequest("ID phòng không hợp lệ.");
+            }
+
+            var roomBill = await _roomBillCollection
+                .Find(bill => bill.IdRoom == objectIdRoom)
                 .FirstOrDefaultAsync();
-            if (priceConfig == null)
+
+            if (roomBill == null)
             {
-                return BadRequest("Chưa thiết lập giá nước.");
+                return NotFound($"Không tìm thấy hóa đơn điện nước cho phòng có ID: {roomId}");
             }
 
-            decimal totalPrice;
-            if (consumption <= priceConfig.waterLimit)
+            // Chuyển đổi ID sang string trước khi trả về
+            var response = new
             {
-                totalPrice = consumption * priceConfig.waterPrice;
-            }
-            else
+                IdRoomBill = roomBill.IdRoomBill.ToString(),
+                IdRoom = roomBill.IdRoom.ToString(),
+                DailyPrice = roomBill.DailyPrice,
+                PriceYear = roomBill.PriceYear,
+                DateOfRecord = roomBill.DateOfRecord,
+                Status = roomBill.Status
+            };
+
+            return Ok(response);
+        }
+        [HttpGet("all/electricity/{roomId}")]
+        public async Task<List<ElectricityBillDto>> GetAllElectricityBillsByRoom(string roomId)
+        {
+            if (!ObjectId.TryParse(roomId, out ObjectId roomObjectId))
             {
-                totalPrice = (priceConfig.waterLimit * priceConfig.waterPrice) +
-                             ((consumption - priceConfig.waterLimit) * priceConfig.waterPriceOverLimit);
+                throw new ArgumentException("ID phòng không hợp lệ");
             }
 
-            var bill = new WaterBillModels
+            var bills = await _electricityBillCollection.Find(bill => bill.IdRoom == roomObjectId)
+                .SortByDescending(b => b.DateOfRecord)
+                .ToListAsync();
+
+            // Chuyển đổi sang DTO với ID là string
+            var result = bills.Select(b => new ElectricityBillDto
             {
-                IdRoom = request.IdRoom,
+                Id = b.Id.ToString(),
+                IdRoom = b.IdRoom.ToString(),
+                StudentCode = b.StudentCode,
+                StudentName = b.StudentName,
+                BeforeIndex = b.BeforeIndex,
+                AfterIndex = b.AfterIndex,
+                Price = b.Price,
+                Total = b.Total,
+                DateOfRecord = b.DateOfRecord,
+                Status = b.Status
+            }).ToList();
+
+            return result;
+        }
+
+        [HttpGet("all/water/{roomId}")]
+        public async Task<List<WaterBillDto>> GetAllWaterBillsByRoom(string roomId)
+        {
+            if (!ObjectId.TryParse(roomId, out ObjectId roomObjectId))
+            {
+                throw new ArgumentException("ID phòng không hợp lệ");
+            }
+
+            var bills = await _waterBillCollection.Find(bill => bill.IdRoom == roomObjectId)
+                .SortByDescending(b => b.DateOfRecord)
+                .ToListAsync();
+
+            // Chuyển đổi sang DTO với ID là string
+            var result = bills.Select(b => new WaterBillDto
+            {
+                Id = b.Id.ToString(),
+                IdRoom = b.IdRoom.ToString(),
+                StudentCode = b.StudentCode,
+                StudentName = b.StudentName,
+                BeforeIndex = b.BeforeIndex,
+                AfterIndex = b.AfterIndex,
+                Price = b.Price,
+                Total = b.Total,
+                DateOfRecord = b.DateOfRecord,
+                Status = b.Status
+            }).ToList();
+
+            return result;
+        }
+
+        [HttpGet("all/bills/{roomId}")]
+        public async Task<IActionResult> GetAllBillsByRoom(string roomId)
+        {
+            if (!ObjectId.TryParse(roomId, out ObjectId roomObjectId))
+            {
+                return BadRequest(new { message = "ID phòng không hợp lệ" });
+            }
+
+            // Lấy tất cả hóa đơn điện
+            var electricityBills = await _electricityBillCollection.Find(bill => bill.IdRoom == roomObjectId)
+                .SortByDescending(b => b.DateOfRecord)
+                .ToListAsync();
+
+            var electricityBillDtos = electricityBills.Select(b => new ElectricityBillDto
+            {
+                Id = b.Id.ToString(),
+                IdRoom = b.IdRoom.ToString(),
+                StudentCode = b.StudentCode,
+                StudentName = b.StudentName,
+                BeforeIndex = b.BeforeIndex,
+                AfterIndex = b.AfterIndex,
+                Price = b.Price,
+                Total = b.Total,
+                DateOfRecord = b.DateOfRecord,
+                Status = b.Status
+            }).ToList();
+
+            // Lấy tất cả hóa đơn nước
+            var waterBills = await _waterBillCollection.Find(bill => bill.IdRoom == roomObjectId)
+                .SortByDescending(b => b.DateOfRecord)
+                .ToListAsync();
+
+            var waterBillDtos = waterBills.Select(b => new WaterBillDto
+            {
+                Id = b.Id.ToString(),
+                IdRoom = b.IdRoom.ToString(),
+                StudentCode = b.StudentCode,
+                StudentName = b.StudentName,
+                BeforeIndex = b.BeforeIndex,
+                AfterIndex = b.AfterIndex,
+                Price = b.Price,
+                Total = b.Total,
+                DateOfRecord = b.DateOfRecord,
+                Status = b.Status
+            }).ToList();
+
+            // Kết hợp các hóa đơn điện và nước
+            var allBills = new
+            {
+                ElectricityBills = electricityBillDtos,
+                WaterBills = waterBillDtos
+            };
+
+            return Ok(allBills);
+        }
+
+        [HttpDelete("electric/{id}")]
+        public async Task<IActionResult> DeleteElectricBill(string id)
+        {
+            if (!ObjectId.TryParse(id, out ObjectId billId))
+                return BadRequest(new { message = "ID hóa đơn không hợp lệ" });
+
+            var result = await _electricityBillCollection.DeleteOneAsync(b => b.Id == billId);
+            if (result.DeletedCount == 0)
+                return NotFound(new { message = "Không tìm thấy hóa đơn điện để xóa" });
+
+            return Ok(new { message = "Đã xóa hóa đơn điện thành công" });
+        }
+
+        [HttpDelete("water/{id}")]
+        public async Task<IActionResult> DeleteWaterBill(string id)
+        {
+            if (!ObjectId.TryParse(id, out ObjectId billId))
+                return BadRequest(new { message = "ID hóa đơn không hợp lệ" });
+
+            var result = await _waterBillCollection.DeleteOneAsync(b => b.Id == billId);
+            if (result.DeletedCount == 0)
+                return NotFound(new { message = "Không tìm thấy hóa đơn nước để xóa" });
+
+            return Ok(new { message = "Đã xóa hóa đơn nước thành công" });
+        }
+
+
+        [HttpGet("latestElectricity/{roomId}")]
+        public async Task<IActionResult> GetLatestElectricityBillByRoom(string roomId)
+        {
+            if (!ObjectId.TryParse(roomId, out ObjectId roomObjectId))
+            {
+                return BadRequest("ID phòng không hợp lệ");
+            }
+
+            var latestBill = await _electricityBillCollection.Find(bill => bill.IdRoom == roomObjectId)
+                .SortByDescending(b => b.DateOfRecord)
+                .Limit(1)
+                .FirstOrDefaultAsync();
+
+            if (latestBill == null)
+            {
+                return NotFound("Không tìm thấy hóa đơn điện nào cho phòng này.");
+            }
+
+            var result = new ElectricityBillDto
+            {
+                Id = latestBill.Id.ToString(),
+                IdRoom = latestBill.IdRoom.ToString(),
+                StudentCode = latestBill.StudentCode,
+                StudentName = latestBill.StudentName,
+                BeforeIndex = latestBill.BeforeIndex,
+                AfterIndex = latestBill.AfterIndex,
+                Price = latestBill.Price,
+                Total = latestBill.Total,
+                DateOfRecord = latestBill.DateOfRecord,
+                Status = latestBill.Status
+            };
+
+            return Ok(result);
+        }
+
+        [HttpGet("latestWater/{roomId}")]
+        public async Task<IActionResult> GetLatestWaterBillByRoom(string roomId)
+        {
+            if (!ObjectId.TryParse(roomId, out ObjectId roomObjectId))
+            {
+                return BadRequest("ID phòng không hợp lệ");
+            }
+
+            var latestBill = await _waterBillCollection.Find(bill => bill.IdRoom == roomObjectId)
+                .SortByDescending(b => b.DateOfRecord)
+                .Limit(1)
+                .FirstOrDefaultAsync();
+
+            if (latestBill == null)
+            {
+                return NotFound("Không tìm thấy hóa đơn điện nào cho phòng này.");
+            }
+
+            var result = new WaterBillDto
+            {
+                Id = latestBill.Id.ToString(),
+                IdRoom = latestBill.IdRoom.ToString(),
+                StudentCode = latestBill.StudentCode,
+                StudentName = latestBill.StudentName,
+                BeforeIndex = latestBill.BeforeIndex,
+                AfterIndex = latestBill.AfterIndex,
+                Price = latestBill.Price,
+                Total = latestBill.Total,
+                DateOfRecord = latestBill.DateOfRecord,
+                Status = latestBill.Status
+            };
+
+            return Ok(result);
+        }
+
+        [HttpPost("add/electricity")]
+        public async Task<IActionResult> AddElectricityBill([FromBody] AddBillElectricityDTO billDto)
+        {
+            if (billDto == null)
+            {
+                return BadRequest("Dữ liệu hóa đơn điện không hợp lệ.");
+            }
+
+            if (!ObjectId.TryParse(billDto.IdRoom.ToString(), out ObjectId roomObjectId))
+            {
+                return BadRequest("ID phòng không hợp lệ.");
+            }
+
+            // Lấy hóa đơn điện gần nhất của phòng
+            var latestBill = await _electricityBillCollection
+                .Find(b => b.IdRoom == roomObjectId)
+                .SortByDescending(b => b.DateOfRecord)
+                .FirstOrDefaultAsync();
+
+            int beforeIndex = latestBill?.AfterIndex ?? 0; // Nếu không có hóa đơn trước đó, chỉ số trước là 0
+
+            // Lấy giá điện mới nhất
+            var priceRecord = await _priceCollection
+                .Find(_ => true)
+                .SortByDescending(p => p.ActionDate)
+                .Limit(1)
+                .FirstOrDefaultAsync();
+
+            if (priceRecord == null)
+            {
+                return StatusCode(500, "Không tìm thấy bảng giá điện.");
+            }
+
+            // Kiểm tra chỉ số sau phải lớn hơn chỉ số trước
+            if (billDto.AfterIndex <= beforeIndex)
+            {
+                return BadRequest("Chỉ số sau phải lớn hơn chỉ số trước của kỳ trước đó.");
+            }
+
+            decimal total = (billDto.AfterIndex - beforeIndex) * priceRecord.ElectricityPrice;
+
+            // Tạo hóa đơn mới
+            var newElectricityBill = new ElectricityBillModels
+            {
+                Id = ObjectId.GenerateNewId(),
+                IdRoom = roomObjectId,
                 BeforeIndex = beforeIndex,
-                AfterIndex = request.AfterIndex,
-                Price = priceConfig.waterPrice,
-                IndexLimit = priceConfig.waterLimit,
-                PriceLimit = priceConfig.waterPriceOverLimit,
-                DateOfRecord = DateTime.UtcNow,
-                Total = totalPrice,
+                AfterIndex = billDto.AfterIndex,
+                StudentCode = null,
+                StudentName = null,
+                Price = priceRecord.ElectricityPrice,
+                Total = total,
+                DateOfRecord = billDto.DateOfRecord,
                 Status = PaymentStatusEnum.unpaid
             };
 
-            _context.WaterBill.Add(bill);
-            await _context.SaveChangesAsync();
+            await _electricityBillCollection.InsertOneAsync(newElectricityBill);
 
-            return Ok(new { Message = "Thêm hóa đơn nước thành công!", Bill = bill });
+            return Ok(new { Message = "Thêm hóa đơn điện thành công!"});
         }
 
-        [HttpGet("electricity/room/{idRoom}")]
-        public async Task<IActionResult> GetElectricityBillsByRoom(int idRoom)
+        [HttpPost("add/water")]
+        public async Task<IActionResult> AddWaterBill([FromBody] AddBillWaterDTO billDto)
         {
-            var bills = await _context.ElectricityBill
-                .Where(b => b.IdRoom == idRoom) // Lọc theo RoomId
-                                 .OrderByDescending(b => b.DateOfRecord)
-                .ToListAsync();
-
-            if (!bills.Any())
+            if (billDto == null)
             {
-                return NotFound(new { message = "Phòng này không có hóa đơn điện nào." });
+                return BadRequest("Dữ liệu hóa đơn điện không hợp lệ.");
             }
 
-            return Ok(bills);
-        }
-
-
-        [HttpGet("water/room/{idRoom}")]
-        public async Task<IActionResult> GetWaterBillsByRoom(int idRoom)
-        {
-            var bills = await _context.WaterBill
-                 .Where(b => b.IdRoom == idRoom)
-                 .OrderByDescending(b => b.DateOfRecord)
-                 .ToListAsync();
-
-            if (!bills.Any())
+            if (!ObjectId.TryParse(billDto.IdRoom.ToString(), out ObjectId roomObjectId))
             {
-                return NotFound(new { message = "Phòng này không có hóa đơn nước nào." });
+                return BadRequest("ID phòng không hợp lệ.");
             }
 
-            return Ok(bills);
-        }
-
-
-
-        [HttpGet("electricity/latest/{idRoom}")]
-        public async Task<IActionResult> GetLatestElectricityBill(int idRoom)
-        {
-            var bill = await _context.ElectricityBill
-                .Where(b => b.IdRoom == idRoom)
-                .OrderByDescending(b => b.DateOfRecord) // Sắp xếp theo ngày gần nhất
+            // Lấy hóa đơn điện gần nhất của phòng
+            var latestBill = await _waterBillCollection
+                .Find(b => b.IdRoom == roomObjectId)
+                .SortByDescending(b => b.DateOfRecord)
                 .FirstOrDefaultAsync();
 
-            if (bill == null)
-            {
-                return NotFound(new { message = "Phòng này không có hóa đơn điện nào." });
-            }
+            int beforeIndex = latestBill?.AfterIndex ?? 0; // Nếu không có hóa đơn trước đó, chỉ số trước là 0
 
-            return Ok(bill);
-        }
-
-        [HttpGet("water/latest/{idRoom}")]
-        public async Task<IActionResult> GetLatestWaterBill(int idRoom)
-        {
-            var bill = await _context.WaterBill
-                .Where(b => b.IdRoom == idRoom)
-                .OrderByDescending(b => b.DateOfRecord) // Sắp xếp theo ngày gần nhất
+            // Lấy giá điện mới nhất
+            var priceRecord = await _priceCollection
+                .Find(_ => true)
+                .SortByDescending(p => p.ActionDate)
+                .Limit(1)
                 .FirstOrDefaultAsync();
 
-            if (bill == null)
+            if (priceRecord == null)
             {
-                return NotFound(new { message = "Phòng này không có hóa đơn nước nào." });
+                return StatusCode(500, "Không tìm thấy bảng giá điện.");
             }
 
-            return Ok(bill);
+            // Kiểm tra chỉ số sau phải lớn hơn chỉ số trước
+            if (billDto.AfterIndex <= beforeIndex)
+            {
+                return BadRequest("Chỉ số sau phải lớn hơn chỉ số trước của kỳ trước đó.");
+            }
+            int usedAmount = billDto.AfterIndex - beforeIndex; // Số nước đã dùng trong tháng
+
+            decimal total;
+            if (usedAmount > priceRecord.WaterLimit)
+            {
+                // Nếu vượt giới hạn, tính phần trong giới hạn và phần dư
+                int excessAmount = usedAmount - priceRecord.WaterLimit;
+                total = (priceRecord.WaterLimit * priceRecord.ElectricityPrice) +
+                        (excessAmount * priceRecord.WaterPriceOverLimit);
+            }
+            else
+            {
+                // Nếu không vượt giới hạn, tính toàn bộ với giá thông thường
+                total = usedAmount * priceRecord.ElectricityPrice;
+            }
+            // Tạo hóa đơn mới
+            var newWaterBill = new WaterBillModels
+            {
+                Id = ObjectId.GenerateNewId(),
+                IdRoom = roomObjectId,
+                BeforeIndex = beforeIndex,
+                AfterIndex = billDto.AfterIndex,
+                Price = priceRecord.ElectricityPrice,
+                IndexLimit = priceRecord.WaterLimit,
+                PriceLimit = priceRecord.WaterPriceOverLimit,
+                Total = total,
+                DateOfRecord = billDto.DateOfRecord,
+                Status = PaymentStatusEnum.unpaid
+            };
+
+            await _waterBillCollection.InsertOneAsync(newWaterBill);
+
+            return Ok(new { Message = "Thêm hóa đơn điện thành công!" });
         }
 
-
-        [HttpPut("electricity/pay/{idBill}")]
-        public async Task<IActionResult> PayElectricityBill(int idBill)
+        [HttpPut("electricity/pay/{billId}")]
+        public async Task<IActionResult> UpdateElectricityBillPayment(string billId, [FromBody] UpdateElectricityBillDTO updateDto)
         {
-            var bill = await _context.ElectricityBill.FindAsync(idBill);
-            if (bill == null)
+            var existingBill = await _electricityBillCollection.Find(b => b.Id.ToString() == billId).FirstOrDefaultAsync();
+            if (existingBill == null)
             {
-                return NotFound("Không tìm thấy hóa đơn điện.");
+                return NotFound("Không tìm thấy hóa đơn với ID này.");
             }
 
-            bill.Status = PaymentStatusEnum.paid;
-            await _context.SaveChangesAsync();
-
-            return Ok(new { Message = "Hóa đơn điện đã được thanh toán." });
-        }
-
-        [HttpPut("water/pay/{idBill}")]
-        public async Task<IActionResult> PayWaterBill(int idBill)
-        {
-            var bill = await _context.WaterBill.FindAsync(idBill);
-            if (bill == null)
+            if (!ObjectId.TryParse(billId, out ObjectId billObjectId))
             {
-                return NotFound("Không tìm thấy hóa đơn nước.");
+                return BadRequest("ID hóa đơn không hợp lệ.");
             }
 
-            bill.Status = PaymentStatusEnum.paid;
-            await _context.SaveChangesAsync();
-
-            return Ok(new { Message = "Hóa đơn nước đã được thanh toán." });
-        }
-
-        [HttpDelete("electricity/{idBill}")]
-        public async Task<IActionResult> DeleteElectricityBill(int idBill)
-        {
-            var bill = await _context.ElectricityBill.FindAsync(idBill);
-            if (bill == null)
+            var updateDefinition = Builders<ElectricityBillModels>.Update
+                .Set(b => b.Status, PaymentStatusEnum.paid); // Cập nhật trạng thái đã thanh toán
+            if (!string.IsNullOrEmpty(updateDto.StudentCode))
             {
-                return NotFound("Không tìm thấy hóa đơn điện.");
+                updateDefinition = updateDefinition.Set(b => b.StudentCode, updateDto.StudentCode);
             }
 
-            _context.ElectricityBill.Remove(bill);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { Message = "Xóa hóa đơn điện thành công!" });
-        }
-
-        [HttpDelete("water/{idBill}")]
-        public async Task<IActionResult> DeleteWaterBill(int idBill)
-        {
-            var bill = await _context.WaterBill.FindAsync(idBill);
-            if (bill == null)
+            if (!string.IsNullOrEmpty(updateDto.StudentName))
             {
-                return NotFound("Không tìm thấy hóa đơn nước.");
+                updateDefinition = updateDefinition.Set(b => b.StudentName, updateDto.StudentName);
             }
 
-            _context.WaterBill.Remove(bill);
-            await _context.SaveChangesAsync();
+            var updateResult = await _electricityBillCollection.UpdateOneAsync(
+                b => b.Id == billObjectId,
+                updateDefinition
+            );
 
-            return Ok(new { Message = "Xóa hóa đơn nước thành công!" });
+            if (updateResult.MatchedCount == 0)
+            {
+                return NotFound("Không tìm thấy hóa đơn cần cập nhật.");
+            }
+
+            // Sau khi update hóa đơn thành công...
+            if (updateResult.MatchedCount > 0 && existingBill.IdRoom != null)
+            {
+                var roomId = existingBill.IdRoom;
+
+                // Lấy danh sách sinh viên trong phòng (status active hoặc wait)
+                var filter = Builders<RegisterRoomModels>.Filter.And(
+                    Builders<RegisterRoomModels>.Filter.Eq(r => r.IdRoom, roomId),
+                    Builders<RegisterRoomModels>.Filter.In(r => r.Status, new[] { OperatingStatusEnum.active, OperatingStatusEnum.wait })
+                );
+
+                var registerRooms = await _registerRoomCollection.Find(filter).ToListAsync();
+
+                foreach (var register in registerRooms)
+                {
+                    var student = await _infoStudents.Find(s => s.Id == register.IdStudent).FirstOrDefaultAsync();
+                    if (student?.Email != null)
+                    {
+                        var name = updateDto.StudentName ?? "một thành viên trong phòng";
+                        var code = updateDto.StudentCode ?? "";
+                        var subject = "Thông báo thanh toán hóa đơn điện";
+                        var body = $"<p>Xin chào,</p><p>Hóa đơn điện của phòng bạn đã được thanh toán bởi <strong>{name}</strong> ({code}).</p><p>Trân trọng.</p>";
+
+                        try
+                        {
+                            await _emailService.SendEmailAsync(student.Email, student.Account?.UserName ?? "Bạn", subject, body);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine("❌ Lỗi gửi email: " + ex.Message);
+                        }
+                    }
+                }
+            }
+
+            return Ok(new { Message = "Cập nhật thông tin thanh toán thành công!" });
         }
 
-        [HttpGet("room/{idRoom}/has-unpaid-bill")]
-        public async Task<IActionResult> CheckUnpaidBill(int idRoom)
+        [HttpPut("water/pay/{billId}")]
+        public async Task<IActionResult> UpdateWaterBillPayment(string billId, [FromBody] UpdateElectricityBillDTO updateDto)
         {
-            bool hasUnpaidBill = await _context.ElectricityBill.AnyAsync(b => b.IdRoom == idRoom && b.Status == PaymentStatusEnum.unpaid)
-                              || await _context.WaterBill.AnyAsync(b => b.IdRoom == idRoom && b.Status == PaymentStatusEnum.unpaid);
+            var existingBill = await _waterBillCollection.Find(b => b.Id.ToString() == billId).FirstOrDefaultAsync();
+            if (existingBill == null)
+            {
+                return NotFound("Không tìm thấy hóa đơn với ID này.");
+            }
+
+            if (!ObjectId.TryParse(billId, out ObjectId billObjectId))
+            {
+                return BadRequest("ID hóa đơn không hợp lệ.");
+            }
+
+            var updateDefinition = Builders<WaterBillModels>.Update
+                .Set(b => b.Status, PaymentStatusEnum.paid); // Cập nhật trạng thái đã thanh toán
+            if (!string.IsNullOrEmpty(updateDto.StudentCode))
+            {
+                updateDefinition = updateDefinition.Set(b => b.StudentCode, updateDto.StudentCode);
+            }
+
+            if (!string.IsNullOrEmpty(updateDto.StudentName))
+            {
+                updateDefinition = updateDefinition.Set(b => b.StudentName, updateDto.StudentName);
+            }
+
+            var updateResult = await _waterBillCollection.UpdateOneAsync(
+                b => b.Id == billObjectId,
+                updateDefinition
+            );
+
+            if (updateResult.MatchedCount == 0)
+            {
+                return NotFound("Không tìm thấy hóa đơn cần cập nhật.");
+            }
+            // Sau khi update hóa đơn thành công...
+            if (updateResult.MatchedCount > 0 && existingBill.IdRoom != null)
+            {
+                var roomId = existingBill.IdRoom;
+
+                // Lấy danh sách sinh viên trong phòng (status active hoặc wait)
+                var filter = Builders<RegisterRoomModels>.Filter.And(
+                    Builders<RegisterRoomModels>.Filter.Eq(r => r.IdRoom, roomId),
+                    Builders<RegisterRoomModels>.Filter.In(r => r.Status, new[] { OperatingStatusEnum.active, OperatingStatusEnum.wait })
+                );
+
+                var registerRooms = await _registerRoomCollection.Find(filter).ToListAsync();
+
+                foreach (var register in registerRooms)
+                {
+                    var student = await _infoStudents.Find(s => s.Id == register.IdStudent).FirstOrDefaultAsync();
+                    if (student?.Email != null)
+                    {
+                        var name = updateDto.StudentName ?? "một thành viên trong phòng";
+                        var code = updateDto.StudentCode ?? "";
+                        var subject = "Thông báo thanh toán hóa đơn nước";
+                        var body = $"<p>Xin chào,</p><p>Hóa đơn nước của phòng bạn đã được thanh toán bởi <strong>{name}</strong> ({code}).</p><p>Trân trọng.</p>";
+
+                        try
+                        {
+                            await _emailService.SendEmailAsync(student.Email, student.Account?.UserName ?? "Bạn", subject, body);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine("❌ Lỗi gửi email: " + ex.Message);
+                        }
+                    }
+                }
+            }
+            return Ok(new { Message = "Cập nhật thông tin thanh toán thành công!" });
+        }
+
+        [HttpGet("room/{roomId}/has-unpaid-bill")]
+        public async Task<IActionResult> CheckHasUnpaidBill(string roomId)
+        {
+            if (!ObjectId.TryParse(roomId, out ObjectId roomObjectId))
+            {
+                return BadRequest(new { message = "ID phòng không hợp lệ" });
+            }
+
+            // Kiểm tra hóa đơn điện chưa thanh toán
+            var hasUnpaidElectricity = await _electricityBillCollection
+                .Find(bill => bill.IdRoom == roomObjectId && bill.Status != PaymentStatusEnum.paid)
+                .AnyAsync();
+
+            // Kiểm tra hóa đơn nước chưa thanh toán
+            var hasUnpaidWater = await _waterBillCollection
+                .Find(bill => bill.IdRoom == roomObjectId && bill.Status != PaymentStatusEnum.paid)
+                .AnyAsync();
+
+            // Nếu có ít nhất một loại hóa đơn chưa thanh toán
+            bool hasUnpaidBill = hasUnpaidElectricity || hasUnpaidWater;
 
             return Ok(new { hasUnpaidBill });
         }
 
+
+
     }
-
-
-
 
 }

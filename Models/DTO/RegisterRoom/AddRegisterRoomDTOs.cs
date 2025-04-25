@@ -8,10 +8,9 @@ namespace API_dormitory.Models.DTO.RegisterRoom
 {
     public class AddRegisterRoomDTOs
     {
-        public int IdRegister { get; set; }
-        public int idUser { get; set; }
-        public int idRoom { get; set; }
-        public int idRegistrationPeriod { get; set; }
+        public string idUser { get; set; }
+        public string idRoom { get; set; }
+        public string idRegistrationPeriod { get; set; }
         public DateTime startDate { get; set; }
         public DateTime endDate { get; set; }
         public DateTime actionDate { get; set; }

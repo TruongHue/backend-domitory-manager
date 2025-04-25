@@ -9,12 +9,11 @@ namespace API_dormitory.Models.DTO.Room
 {
     public class InfoRoomDTOs
     {
-        public int IdRoom { get; set; }
-        public int? IdBuilding { get; set; }
+        public string IdRoom { get; set; }
+        public string? IdBuilding { get; set; }
         public string? RoomName { get; set; }
         public int? NumberOfBed { get; set; }
         public OperatingStatusEnum? Status { get; set; }
-        public BuildingDTOs Building { get; set; } // Chứa thông tin của tòa nhà
         public GenderEnum Gender { get; internal set; }
     }
 }

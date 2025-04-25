@@ -9,9 +9,9 @@ namespace API_dormitory.Models.DTO
     public class RoomBillDTO
     {
 
-        public int IdRoomBill { get; set; }
+        public string IdRoomBill { get; set; }
 
-        public int IdRoom { get; set; }
+        public string IdRoom { get; set; }
 
 
         public DateTime DateOfRecord { get; set; }

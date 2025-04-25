@@ -2,7 +2,7 @@
 {
     public class AddBillWaterDTO
     {
-        public int IdRoom { get; set; }
+        public string IdRoom { get; set; }
         public int AfterIndex { get; set; }
         public DateTime DateOfRecord { get; set; }
     }

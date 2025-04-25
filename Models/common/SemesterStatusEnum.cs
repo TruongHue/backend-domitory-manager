@@ -2,7 +2,7 @@
 {
     public enum SemesterStatusEnum
     {
-        inSemester,  // Trong năm học
-        summerBreak  // Nghỉ hè
+        summerBreak,  // Nghỉ hè
+        inSemester  // Trong năm học  
     }
 }

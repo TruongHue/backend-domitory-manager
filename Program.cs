@@ -3,10 +3,15 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Bson;
+using OfficeOpenXml;
 using System.Text;
 
+ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
 var builder = WebApplication.CreateBuilder(args);
+
 builder.Services.AddSingleton<MongoDbContext>();
+
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -88,6 +93,8 @@ builder.Services.AddCors(options =>
                   .AllowAnyHeader(); // Cho phép tất cả các header
         });
 });
+
+builder.Services.AddSingleton<EmailService>();
 
 // ✅ **Tạo `app` sau khi đã cấu hình tất cả các dịch vụ**
 var app = builder.Build();

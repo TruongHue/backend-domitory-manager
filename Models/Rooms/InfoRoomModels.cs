@@ -1,44 +1,56 @@
-﻿using API_dormitory.Models.Bills;
-using API_dormitory.Models.common;
-using API_dormitory.Models.DTO;
+﻿using API_dormitory.Models.common;
+using API_dormitory.Models.Bills;
 using API_dormitory.Models.registerRoom;
-using API_dormitory.Models.Users;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+using System.Collections.Generic;
 
 namespace API_dormitory.Models.Rooms
 {
     public class InfoRoomModels
     {
-        [Key]
-        [Column("idRoom")]
-        public int IdRoom { get; set; }
+        [BsonId]
+        public ObjectId IdRoom { get; set; }  // Chuyển từ int -> ObjectId
 
-        [Required]
-        [ForeignKey("Building")]  // Đổi tên Foreign Key đúng với Navigation Property
-        [Column("idBuilding")]
-        public int IdBuilding { get; set; }
+        [BsonElement("idBuilding")]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public ObjectId IdBuilding { get; set; }  // Giữ nguyên để liên kết
 
-        [Required]
-        [Column("nameRoom")]
+        [BsonElement("roomName")]
+        [BsonRequired]
         public string RoomName { get; set; } = string.Empty;
 
-        [Required]
-        [Column("numberOfBed")]
+        [BsonElement("numberOfBed")]
+        [BsonRequired]
         public int NumberOfBed { get; set; }
-        [Required]
-        [Column("gender")]
+
+        [BsonElement("gender")]
+        [BsonRequired]
         public GenderEnum Gender { get; set; }
-        [Required]
-        [Column("status")]
+
+        [BsonElement("status")]
+        [BsonRequired]
         public OperatingStatusEnum Status { get; set; }
-        // Navigation Property (Một phòng thuộc về một tòa nhà)
-        public virtual BuildingModels Building { get; set; }
-        public virtual List<ElectricityBillModels> ElectricityBills { get; set; } = new List<ElectricityBillModels>();
-        public virtual List<WaterBillModels> WaterBills { get; set; } = new List<WaterBillModels>();
-        public virtual List<RoomBillModels> RoomBills { get; set; } = new List<RoomBillModels>();
-        public virtual List<RegisterRoomModels> RegisterRooms { get; set; } = new List<RegisterRoomModels>();
+
+        // Lưu trực tiếp toàn bộ Object thay vì chỉ lưu ID
+        [BsonElement("building")]
+        public BuildingModels Building { get; set; } = new BuildingModels();
+
+        [BsonElement("electricityBillIds")]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public List<ObjectId> ElectricityBillIds { get; set; } = new List<ObjectId>();
+        [BsonElement("waterBillIds")]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public List<ObjectId> WaterBillIds { get; set; } = new List<ObjectId>();
+
+
+        [BsonElement("roomBillIds")]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public List<ObjectId> RoomBillIds { get; set; } = new List<ObjectId>();
+
+        [BsonElement("registerRoomIds")]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public List<ObjectId> RegisterRoomIds { get; set; } = new List<ObjectId>();
 
     }
-
 }

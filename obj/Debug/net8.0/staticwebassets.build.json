@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "rhGLNv3+TZSsA9vtYpPCBMVymoQGaZjrATZYVRhV3rk=",
+  "Hash": "zvaPxfjAOlOT7OEd6XMVWGYp7sxN/qIBanY7ocdz6pw=",
   "Source": "API_dormitory",
   "BasePath": "_content/API_dormitory",
   "Mode": "Default",
@@ -16,6 +16,25 @@
     }
   ],
   "Assets": [
+    {
+      "Identity": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\1041f079-5cc1-4339-b1ac-6a8fce97ef55.jpg",
+      "SourceId": "API_dormitory",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\",
+      "BasePath": "_content/API_dormitory",
+      "RelativePath": "images/1041f079-5cc1-4339-b1ac-6a8fce97ef55.jpg",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\images\\1041f079-5cc1-4339-b1ac-6a8fce97ef55.jpg"
+    },
     {
       "Identity": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\10f6d40b-bf19-4ec1-8973-6f1b81c3af56.jpg",
       "SourceId": "API_dormitory",
@@ -53,6 +72,25 @@
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot\\images\\283e8593-b527-4818-98f2-33ca6d29960c.jpg"
+    },
+    {
+      "Identity": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\397c8763-b24c-428a-a1e9-1a38e646e622.jpg",
+      "SourceId": "API_dormitory",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\",
+      "BasePath": "_content/API_dormitory",
+      "RelativePath": "images/397c8763-b24c-428a-a1e9-1a38e646e622.jpg",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\images\\397c8763-b24c-428a-a1e9-1a38e646e622.jpg"
     },
     {
       "Identity": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\47b75ff0-6137-4c66-b09d-0418cfe1bb75.jpg",
@@ -167,6 +205,25 @@
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot\\images\\84547d09-d342-4299-a10d-fead75631b6a.png"
+    },
+    {
+      "Identity": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\89e2f2ca-6229-4dc5-838e-d601276ae979.jpg",
+      "SourceId": "API_dormitory",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\",
+      "BasePath": "_content/API_dormitory",
+      "RelativePath": "images/89e2f2ca-6229-4dc5-838e-d601276ae979.jpg",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\images\\89e2f2ca-6229-4dc5-838e-d601276ae979.jpg"
     },
     {
       "Identity": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\b85bf556-9a13-45b8-b760-d5ba40bfebd1.png",

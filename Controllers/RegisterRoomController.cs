@@ -1,16 +1,17 @@
 ﻿using API_dormitory.Data;
 using API_dormitory.Models.Bills;
 using API_dormitory.Models.common;
-using API_dormitory.Models.DTO.Building;
 using API_dormitory.Models.DTO.RegisterRoom;
-using API_dormitory.Models.DTO.Room;
-using API_dormitory.Models.DTO.User;
 using API_dormitory.Models.registerRoom;
-using API_dormitory.Models.Registrations;
 using API_dormitory.Models.Rooms;
+using API_dormitory.Models.Users;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using System.Net.NetworkInformation;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace API_dormitory.Controllers
 {
@@ -18,361 +19,661 @@ namespace API_dormitory.Controllers
     [ApiController]
     public class RegisterRoomController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IMongoCollection<RegisterRoomModels> _registerRoomCollection;
+        private readonly IMongoCollection<RoomBillModels> _roomBillCollection;
+        private readonly IMongoCollection<PriceWaterAndElectricity> _priceCollection;
+        private readonly IMongoCollection<InfoRoomModels> _roomsCollection;
+        private readonly IMongoCollection<BuildingModels> _buildingsCollection;
+        private readonly IMongoCollection<AccountModels> _accounts;
+        private readonly EmailService _emailService;
+        private readonly IMongoCollection<InfoStudentModels> _infoStudents;
+        /*        private readonly IRoomService _roomService;
+        */
 
-        public RegisterRoomController(AppDbContext context)
+        public RegisterRoomController(MongoDbContext database, EmailService emailService)
         {
-            _context = context;
+            _registerRoomCollection = database.GetCollection<RegisterRoomModels>("RegisterRoom");
+            _roomBillCollection = database.GetCollection<RoomBillModels>("RoomBills");
+            _roomsCollection = database.GetCollection<InfoRoomModels>("Rooms");
+            _buildingsCollection = database.GetCollection<BuildingModels>("Buildings");
+            _accounts = database.GetCollection<AccountModels>("Accounts");
+            _infoStudents = database.GetCollection<InfoStudentModels>("InfoStudents");
+            _emailService = emailService;
+
         }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAllRegisterRooms()
+        {
+            var registerRooms = await _registerRoomCollection.Find(_ => true).ToListAsync();
+
+            if (registerRooms == null || registerRooms.Count == 0)
+                return NotFound(new { message = "Không có dữ liệu đăng ký phòng." });
+
+            var result = new List<object>();
+
+            foreach (var r in registerRooms)
+            {
+                // Lấy thông tin sinh viên
+                var student = await _infoStudents.Find(u => u.Id == r.IdStudent).FirstOrDefaultAsync();
+
+                // Nếu có sinh viên, lấy thông tin tài khoản từ `AccountId`
+                AccountModels? account = null;
+                if (student?.AccountId != null)
+                {
+                    account = await _accounts.Find(u => u.AccountId == student.AccountId).FirstOrDefaultAsync();
+                }
+
+                // Lấy thông tin phòng
+                var room = await _roomsCollection.Find(room => room.IdRoom == r.IdRoom).FirstOrDefaultAsync();
+
+                // Lấy thông tin tòa nhà nếu có phòng
+                var building = room != null
+      ? await _buildingsCollection.Find(b => b.IdBuilding == room.IdBuilding)
+                                  .Project(b => new { b.NameBuilding })
+                                  .FirstOrDefaultAsync()
+      : null;
+
+                var registerRoomWithDetails = new
+                {
+                    IdRegister = r.IdRegister.ToString(),
+                    IdStudent = r.IdStudent.ToString(),
+                    StudentInfo = student != null ? new
+                    {
+                        Id = student.Id.ToString(),
+                        student.Email,
+                        student.Address,
+                        student.NameParent,
+                        student.ParentNumberPhone
+                    } : null,
+                    AccountInfo = account != null ? new
+                    {
+                        AccountId = account.AccountId.ToString(),
+                        account.UserName,
+                        account.UserCode,
+                        account.NumberPhone,
+                        account.Roles,
+                        account.Status
+                    } : null,
+                    IdRoom = r.IdRoom.ToString(),
+                    RoomInfo = room != null ? new
+                    {
+                        room.RoomName
+                    } : null,
+                    BuildingInfo = building != null ? new
+                    {
+                        building.NameBuilding
+                    } : null,
+                    IdRegistrationPeriod = r.IdRegistrationPeriod.ToString(),
+                    StartDate = r.StartDate,
+                    EndDate = r.EndDate,
+                    ActionDate = r.ActionDate,
+                    Total = r.Total,
+                    PaymentStatus = r.PaymentStatus,
+                    Status = r.Status
+                };
+
+                result.Add(registerRoomWithDetails);
+            }
+
+            return Ok(result);
+        }
+
 
         [HttpPost]
         public async Task<IActionResult> CreateRegister([FromBody] AddRegisterRoomDTOs registerDto)
         {
-            try
+            if (registerDto == null)
+                return BadRequest(new { message = "Dữ liệu đăng ký không hợp lệ." });
+
+            registerDto.actionDate = DateTime.UtcNow;
+
+            var studentId = ObjectId.Parse(registerDto.idUser); // Chuyển đổi idUser từ string sang ObjectId
+            var roomId = ObjectId.Parse(registerDto.idRoom);
+            var registrationPeriodId = ObjectId.Parse(registerDto.idRegistrationPeriod);
+
+            // Kiểm tra xem sinh viên đã có đăng ký trạng thái 'active' chưa
+            var existingRegister = await _registerRoomCollection
+                .Find(r => r.IdStudent == studentId && r.Status == OperatingStatusEnum.active)
+                .FirstOrDefaultAsync();
+
+            // Lấy thông tin phòng
+            var room = await _roomsCollection.Find(r => r.IdRoom == roomId).FirstOrDefaultAsync();
+
+            if (room == null)
+                return NotFound(new { message = "Phòng không tồn tại." });
+
+            // Lấy thông tin sinh viên
+            var student = await _infoStudents.Find(s => s.Id == studentId).FirstOrDefaultAsync();
+
+            if (student == null)
+                return NotFound(new { message = "Sinh viên không tồn tại." });
+
+            // Kiểm tra giới tính sinh viên
+            if (student.Gender != room.Gender)
             {
-                if (registerDto == null)
+                return BadRequest(new { message = "Giới tính của sinh viên không phù hợp với giới tính yêu cầu của phòng." });
+            }
+
+            // Kiểm tra đăng ký phòng trước đó
+            if (existingRegister != null)
+                return BadRequest(new { message = "Bạn đã đăng ký phòng trước đó và vẫn đang hoạt động." });
+
+            // Tạo mới đăng ký phòng
+            var newRegister = new RegisterRoomModels
+            {
+                IdRegister = ObjectId.GenerateNewId(),
+                IdStudent = studentId,
+                IdRoom = roomId,
+                IdRegistrationPeriod = registrationPeriodId,
+                StartDate = registerDto.startDate,
+                EndDate = registerDto.endDate,
+                ActionDate = registerDto.actionDate,
+                Total = (double)registerDto.total,
+                PaymentStatus = registerDto.paymentStatus,
+                Status = OperatingStatusEnum.wait
+            };
+
+            await _registerRoomCollection.InsertOneAsync(newRegister);
+
+            // Kiểm tra nếu trạng thái thanh toán là "Đã thanh toán" và gửi email
+            if (registerDto.paymentStatus == PaymentStatusEnum.paid)
+            {
+                var studentInfo = await _infoStudents.Find(s => s.Id == studentId).FirstOrDefaultAsync();
+
+                if (studentInfo?.Email != null)
                 {
-                    return BadRequest(new { message = "Dữ liệu đăng ký không hợp lệ." });
+                    var studentName = studentInfo.Account?.UserName ?? "Bạn";
+
+                    try
+                    {
+                        await _emailService.SendEmailAsync(
+                            studentInfo.Email,
+                            studentName,
+                            "Thông báo thanh toán thành công",
+                            $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Phòng của bạn đã được thanh toán thành công. Chúc bạn có thời gian học tập thoải mái tại ký túc xá.</p><p>Trân trọng.</p>"
+                        );
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("❌ Lỗi khi gửi email: " + ex.Message);
+                    }
                 }
-            registerDto.actionDate = DateTime.Now;
+            }
+            else if (registerDto.paymentStatus == PaymentStatusEnum.unpaid)
+            {
 
-                var user = await _context.InfoStudents.FindAsync(registerDto.idUser);
-                if (user == null)
+                    var studentInfo = await _infoStudents.Find(s => s.Id == studentId).FirstOrDefaultAsync();
+
+                    if (studentInfo?.Email != null)
+                    {
+                    var studentName = studentInfo.Account?.UserName ?? "Bạn";
+
+                    try
+                    {
+                            // Gửi email yêu cầu thanh toán trước khi hết hạn
+                            await _emailService.SendEmailAsync(
+                                  studentInfo.Email,
+                studentName,
+                                "Thông báo thanh toán trước ngày hết hạn",
+                                $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Bạn vui lòng thanh toán phí - phòng trước ngày bất đầu!</p><p>Trân trọng.</p>"
+                            );
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine("❌ Lỗi khi gửi email: " + ex.Message);
+                        }
+                    }
+                
+            }
+
+            return Ok(new { message = "Đăng ký phòng thành công!" });
+        }
+
+
+        [HttpPut("update-payment-status/{idRegister}")]
+        public async Task<IActionResult> UpdatePaymentStatus(string idRegister, [FromBody] UpdateStatusPaymentDTO newPaymentStatus)
+        {
+            if (!ObjectId.TryParse(idRegister, out var objectId))
+                return BadRequest(new { message = "IdRegister không hợp lệ." });
+
+            var filter = Builders<RegisterRoomModels>.Filter.Eq(r => r.IdRegister, objectId);
+
+            // Lấy đăng ký phòng hiện tại để biết thông tin sinh viên
+            var existingRegister = await _registerRoomCollection.Find(filter).FirstOrDefaultAsync();
+
+            if (existingRegister == null)
+                return NotFound(new { message = "Không tìm thấy đăng ký phòng." });
+
+            // Tạo update
+            var updateDefinition = Builders<RegisterRoomModels>.Update
+                .Set(r => r.PaymentStatus, newPaymentStatus.statusPayment);
+
+            if (newPaymentStatus.statusPayment == PaymentStatusEnum.paid)
+            {
+                updateDefinition = updateDefinition.Set(r => r.Status, OperatingStatusEnum.active);
+            }
+            else if (newPaymentStatus.statusPayment == PaymentStatusEnum.cancel)
+            {
+                updateDefinition = updateDefinition.Set(r => r.Status, OperatingStatusEnum.blocked);
+            }
+
+            var result = await _registerRoomCollection.UpdateOneAsync(filter, updateDefinition);
+
+            if (result.MatchedCount == 0)
+                return NotFound(new { message = "Không tìm thấy đăng ký phòng." });
+
+            // Gửi email theo trạng thái thanh toán mới
+            var studentInfo = await _infoStudents.Find(s => s.Id == existingRegister.IdStudent).FirstOrDefaultAsync();
+
+            if (studentInfo?.Email != null)
+            {
+                var studentName = studentInfo.Account?.UserName ?? "Bạn";
+                string subject = "";
+                string body = "";
+
+                switch (newPaymentStatus.statusPayment)
                 {
-                    return NotFound(new { message = $"Không tìm thấy người dùng có ID {registerDto.idUser}." });
+                    case PaymentStatusEnum.paid:
+                        subject = "Thông báo thanh toán thành công";
+                        body = $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Phòng của bạn đã được thanh toán thành công. Chúc bạn có thời gian học tập thoải mái tại ký túc xá.</p><p>Trân trọng.</p>";
+                        break;
+
+                    case PaymentStatusEnum.unpaid:
+                        subject = "Nhắc nhở thanh toán tiền phòng";
+                        body = $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Hệ thống ghi nhận bạn chưa thanh toán tiền phòng. Vui lòng thực hiện thanh toán sớm để tránh ảnh hưởng đến quyền lợi đăng ký phòng.</p><p>Trân trọng.</p>";
+                        break;
+
+                    case PaymentStatusEnum.cancel:
+                        subject = "Thông báo huỷ thanh toán đăng ký phòng";
+                        body = $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Đăng ký phòng của bạn đã bị huỷ do không thanh toán đúng hạn hoặc theo yêu cầu. Vui lòng liên hệ ban quản lý để biết thêm chi tiết.</p><p>Trân trọng.</p>";
+                        break;
                 }
-                var genderRoom = await _context.InfoRoom.FindAsync(registerDto.idRoom);
-                var genderUser = await _context.InfoStudents.FindAsync(registerDto.idUser);
 
-                if (genderUser.Gender != genderRoom.Gender) 
+                try
                 {
-                    return NotFound(new { message = $"Phòng không phù hợp với giới tính của người đăng ký: Phòng dành cho {genderRoom.Gender} và giới tính của người đăng ký là {genderUser.Gender}" });
+                    await _emailService.SendEmailAsync(
+                        studentInfo.Email,
+                        studentName,
+                        subject,
+                        body
+                    );
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("❌ Lỗi khi gửi email sau khi cập nhật trạng thái thanh toán: " + ex.Message);
+                }
+            }
+            return Ok(new { message = "Cập nhật trạng thái thanh toán thành công!" });
+        }
+
+
+        [HttpPut("update-status/{idRegister}")]
+        public async Task<IActionResult> UpdateOperatingStatus(string idRegister, [FromBody] UpdateStatusDTO newStatus)
+        {
+            if (!ObjectId.TryParse(idRegister, out var objectId))
+                return BadRequest(new { message = "IdRegister không hợp lệ." });
+
+            var filter = Builders<RegisterRoomModels>.Filter.Eq(r => r.IdRegister, objectId);
+
+            // Lấy bản ghi trước khi update để có thông tin sinh viên
+            var register = await _registerRoomCollection.Find(filter).FirstOrDefaultAsync();
+            if (register == null)
+                return NotFound(new { message = "Không tìm thấy đăng ký phòng." });
+
+            // Cập nhật trạng thái
+            var update = Builders<RegisterRoomModels>.Update.Set(r => r.Status, newStatus.status);
+            var result = await _registerRoomCollection.UpdateOneAsync(filter, update);
+
+            // Lấy thông tin sinh viên để gửi email
+            var studentInfo = await _infoStudents.Find(s => s.Id == register.IdStudent).FirstOrDefaultAsync();
+            if (studentInfo?.Email != null)
+            {
+                var studentName = studentInfo.Account?.UserName ?? "Bạn";
+                string subject = "";
+                string body = "";
+
+                switch (newStatus.status)
+                {
+                    case OperatingStatusEnum.active:
+                        subject = "Thông báo kích hoạt đăng ký phòng";
+                        body = $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Đăng ký phòng của bạn đã được kích hoạt thành công.</p><p>Chúc bạn có thời gian học tập thoải mái tại ký túc xá!</p><p>Trân trọng.</p>";
+                        break;
+
+                    case OperatingStatusEnum.blocked:
+                        subject = "Thông báo hủy đăng ký phòng";
+                        body = $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Đăng ký phòng của bạn đã bị hủy hoặc chặn. Vui lòng liên hệ ban quản lý để biết thêm chi tiết.</p><p>Trân trọng.</p>";
+                        break;
+
+                    case OperatingStatusEnum.inactive:
+                        subject = "Thông báo tạm ngưng đăng ký phòng";
+                        body = $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Trạng thái đăng ký phòng của bạn đã chuyển sang tạm ngưng. Vui lòng kiểm tra lại hoặc liên hệ hỗ trợ.</p><p>Trân trọng.</p>";
+                        break;
+
+                    case OperatingStatusEnum.wait:
+                        subject = "Thông báo chờ duyệt đăng ký phòng";
+                        body = $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Đăng ký phòng của bạn đang được xét duyệt. Vui lòng chờ phản hồi từ ban quản lý ký túc xá.</p><p>Trân trọng.</p>";
+                        break;
                 }
 
-                var room = await _context.InfoRoom.FindAsync(registerDto.idRoom);
-
-                // Kiểm tra trạng thái phòng
-                if (room.Status == OperatingStatusEnum.inactive)
+                try
                 {
-                    return BadRequest(new { message = "Phòng hiện không mở." });
+                    await _emailService.SendEmailAsync(
+                        studentInfo.Email,
+                        studentName,
+                        subject,
+                        body
+                    );
                 }
-                if (room == null)
+                catch (Exception ex)
                 {
-                    return NotFound(new { message = $"Không tìm thấy phòng có ID {registerDto.idRoom}." });
+                    Console.WriteLine("❌ Lỗi khi gửi email sau khi cập nhật trạng thái: " + ex.Message);
+                }
+            }
+
+            return Ok(new { message = "Cập nhật trạng thái hoạt động thành công!" });
+        }
+
+
+        [HttpPut("update-register/{idRegister}")]
+        public async Task<IActionResult> UpdateRegisterRoom(string idRegister, [FromBody] UpdateRegisterRoomDTO updateDto)
+        {
+            if (!ObjectId.TryParse(idRegister, out var objectId))
+                return BadRequest(new { message = "IdRegister không hợp lệ." });
+
+            var filter = Builders<RegisterRoomModels>.Filter.Eq(r => r.IdRegister, objectId);
+
+            var update = Builders<RegisterRoomModels>.Update
+                .Set(r => r.IdStudent, ObjectId.Parse(updateDto.IdStudent))
+                .Set(r => r.IdRoom, ObjectId.Parse(updateDto.IdRoom))
+                .Set(r => r.IdRegistrationPeriod, ObjectId.Parse(updateDto.IdRegistrationPeriod))
+                .Set(r => r.StartDate, updateDto.StartDate)
+                .Set(r => r.EndDate, updateDto.EndDate)
+                .Set(r => r.ActionDate, updateDto.ActionDate)
+                .Set(r => r.Total, updateDto.Total)
+                .Set(r => r.PaymentStatus, updateDto.PaymentStatus)
+                .Set(r => r.Status, updateDto.Status);
+
+            var result = await _registerRoomCollection.UpdateOneAsync(filter, update);
+
+            if (result.MatchedCount == 0)
+                return NotFound(new { message = "Không tìm thấy đăng ký phòng." });
+
+            return Ok(new { message = "Cập nhật thông tin đăng ký phòng thành công!" });
+        }
+
+        [HttpDelete("delete-register/{idRegister}")]
+        public async Task<IActionResult> DeleteRegisterRoom(string idRegister)
+        {
+            if (!ObjectId.TryParse(idRegister, out var objectId))
+                return BadRequest(new { message = "IdRegister không hợp lệ." });
+
+            var filter = Builders<RegisterRoomModels>.Filter.Eq(r => r.IdRegister, objectId);
+            var result = await _registerRoomCollection.DeleteOneAsync(filter);
+
+            if (result.DeletedCount == 0)
+                return NotFound(new { message = "Không tìm thấy đăng ký phòng để xóa." });
+
+            return Ok(new { message = "Xóa đăng ký phòng thành công!" });
+        }
+        [HttpGet("total-registered-students")]
+        public async Task<IActionResult> GetTotalRegisteredStudents()
+        {
+            // Tổng số sinh viên trong hệ thống
+            var totalStudents = await _infoStudents.CountDocumentsAsync(FilterDefinition<InfoStudentModels>.Empty);
+
+            // Tổng số sinh viên đã đăng ký ít nhất 1 lần
+            var registeredStudents = await _registerRoomCollection.DistinctAsync<ObjectId>(
+                "IdStudent",
+                FilterDefinition<RegisterRoomModels>.Empty
+            );
+
+            // Số sinh viên đã đăng ký
+            var totalRegistered = (await registeredStudents.ToListAsync()).Count;
+
+            // Tính số sinh viên chưa đăng ký
+            var unregisteredStudents = totalStudents - totalRegistered;
+            if (unregisteredStudents < 0) unregisteredStudents = 0;
+
+            return Ok(new
+            {
+                TotalStudents = totalStudents,
+                TotalRegisteredStudents = totalRegistered,
+                UnregisteredStudents = unregisteredStudents // Trả về số sinh viên chưa đăng ký
+            });
+        }
+
+
+        [HttpGet("history/{idStudent}")]
+        public async Task<IActionResult> GetRegisterRoomHistory(string idStudent)
+        {
+            if (!ObjectId.TryParse(idStudent, out var studentId))
+                return BadRequest(new { message = "IdStudent không hợp lệ." });
+
+            // Lọc các đăng ký phòng của sinh viên theo IdStudent
+            var registerRooms = await _registerRoomCollection
+                .Find(r => r.IdStudent == studentId)
+                .ToListAsync();
+
+            if (registerRooms == null || registerRooms.Count == 0)
+                return NotFound(new { message = "Không có lịch sử đăng ký phòng cho sinh viên này." });
+
+            var result = new List<object>();
+
+            foreach (var r in registerRooms)
+            {
+                // Lấy thông tin sinh viên
+                var student = await _infoStudents.Find(u => u.Id == r.IdStudent).FirstOrDefaultAsync();
+
+                // Nếu có sinh viên, lấy thông tin tài khoản từ `AccountId`
+                AccountModels? account = null;
+                if (student?.AccountId != null)
+                {
+                    account = await _accounts.Find(u => u.AccountId == student.AccountId).FirstOrDefaultAsync();
                 }
 
-                // Kiểm tra trạng thái đăng ký
-                var registrationStatus = await _context.RegistrationPeriods
-                    .OrderByDescending(rp => rp.Status == RegistrationStatusEnum.open)
-                    .FirstOrDefaultAsync();
+                // Lấy thông tin phòng
+                var room = await _roomsCollection.Find(room => room.IdRoom == r.IdRoom).FirstOrDefaultAsync();
 
-                if (registrationStatus == null || registrationStatus.Status == RegistrationStatusEnum.closed)
+                // Lấy thông tin tòa nhà nếu có phòng
+                var building = room != null
+                    ? await _buildingsCollection.Find(b => b.IdBuilding == room.IdBuilding)
+                                                .Project(b => new { b.NameBuilding })
+                                                .FirstOrDefaultAsync()
+                    : null;
+
+                var registerRoomWithDetails = new
                 {
-                    return BadRequest(new { message = "Đăng ký hiện đang đóng." });
-                }
-
-                // Kiểm tra xem người dùng đã có phòng đang hoạt động chưa
-                var existingRegister = await _context.RegisterRoom
-                    .Where(r => r.idStudent == registerDto.idUser && r.status == OperatingStatusEnum.active)
-                    .FirstOrDefaultAsync();
-
-                if (existingRegister != null &&
-                   (existingRegister.paymentStatus == PaymentStatusEnum.unpaid ||
-                    existingRegister.paymentStatus == PaymentStatusEnum.paid))
-                {
-                    return BadRequest(new { message = "Bạn đã đăng ký phòng trước đó và vẫn đang hoạt động." });
-                }
-
-
-
-                // Lấy hóa đơn phòng đang active
-                var roomBill = await _context.RoomBill
-                    .Where(rb => rb.IdRoom == registerDto.idRoom && rb.Status == OperatingStatusEnum.active)
-                    .OrderByDescending(rb => rb.DateOfRecord)
-                    .FirstOrDefaultAsync();
-
-                if (roomBill == null)
-                {
-                    return BadRequest(new { message = "Không tìm thấy hóa đơn phòng hợp lệ." });
-                }
-
-                // Tính toán tổng giá
-                decimal totalPrice;
-                if (registrationStatus.SemesterStatus == SemesterStatusEnum.inSemester)
-                {
-                    totalPrice = roomBill.PriceYear;
-                }
-                else
-                {
-                    int totalDays = (registerDto.endDate - registerDto.startDate).Days;
-                    totalPrice = roomBill.DailyPrice * totalDays;
-                }
-
-                var newRegister = new RegisterRoomModels
-                {
-                    idStudent = registerDto.idUser,
-                    idRoom = registerDto.idRoom,
-                    idRegistrationPeriod = registerDto.idRegistrationPeriod,
-                    startDate = registerDto.startDate,
-                    endDate = registerDto.endDate,
-                    ActionDate = registerDto.actionDate,
-                    total = totalPrice,
-                    paymentStatus = registerDto.paymentStatus,
-                    status = OperatingStatusEnum.wait
+                    IdRegister = r.IdRegister.ToString(),
+                    IdStudent = r.IdStudent.ToString(),
+                    StudentInfo = student != null ? new
+                    {
+                        Id = student.Id.ToString(),
+                        student.Email,
+                        student.Address,
+                        student.NameParent,
+                        student.ParentNumberPhone
+                    } : null,
+                    AccountInfo = account != null ? new
+                    {
+                        AccountId = account.AccountId.ToString(),
+                        account.UserName,
+                        account.UserCode,
+                        account.NumberPhone,
+                        account.Roles,
+                        account.Status
+                    } : null,
+                    IdRoom = r.IdRoom.ToString(),
+                    RoomInfo = room != null ? new
+                    {
+                        room.RoomName
+                    } : null,
+                    BuildingInfo = building != null ? new
+                    {
+                        building.NameBuilding
+                    } : null,
+                    IdRegistrationPeriod = r.IdRegistrationPeriod.ToString(),
+                    StartDate = r.StartDate,
+                    EndDate = r.EndDate,
+                    ActionDate = r.ActionDate,
+                    Total = r.Total,
+                    PaymentStatus = r.PaymentStatus,
+                    Status = r.Status
                 };
 
-                _context.RegisterRoom.Add(newRegister);
-                await _context.SaveChangesAsync();
+                result.Add(registerRoomWithDetails);
+            }
 
-                return Ok(new { message = "Đăng ký phòng thành công!" });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            return Ok(result);
         }
 
-
-        [HttpPut("update-status")]
-        public async Task<IActionResult> UpdateRegisterRoomStatus()
+        [HttpGet("students-in-room/{idRoom}")]
+        public async Task<IActionResult> GetStudentsInRoom(string idRoom)
         {
-            var currentDate = DateTime.UtcNow;
+            if (!ObjectId.TryParse(idRoom, out var roomId))
+                return BadRequest(new { message = "IdRoom không hợp lệ." });
 
-            // Lấy tất cả các đăng ký có ngày kết thúc nhỏ hơn ngày hiện tại
-            var expiredRegistrations = await _context.RegisterRoom
-                .Where(r => r.endDate < currentDate && r.status != OperatingStatusEnum.inactive)
-                .ToListAsync();
+            // Tìm tất cả các đăng ký có cùng IdRoom và trạng thái là active hoặc wait
+            var filter = Builders<RegisterRoomModels>.Filter.And(
+                Builders<RegisterRoomModels>.Filter.Eq(r => r.IdRoom, roomId),
+                Builders<RegisterRoomModels>.Filter.In(r => r.Status, new[] { OperatingStatusEnum.active, OperatingStatusEnum.wait })
+            );
 
-            if (!expiredRegistrations.Any())
+            var registerRooms = await _registerRoomCollection.Find(filter).ToListAsync();
+
+            if (registerRooms.Count == 0)
+                return NotFound(new { message = "Không có sinh viên nào đăng ký phòng này với trạng thái active hoặc wait." });
+
+            var result = new List<object>();
+
+            foreach (var register in registerRooms)
             {
-                return Ok("Không có đăng ký nào cần cập nhật.");
+                var student = await _infoStudents.Find(s => s.Id == register.IdStudent).FirstOrDefaultAsync();
+                var account = student != null
+                    ? await _accounts.Find(a => a.AccountId == student.AccountId).FirstOrDefaultAsync()
+                    : null;
+
+                result.Add(new
+                {
+                    IdRegister = register.IdRegister.ToString(),
+                    IdRoom = register.IdRoom.ToString(),
+                    IdStudent = register.IdStudent.ToString(),
+                    StudentInfo = student != null ? new
+                    {
+                        Id = student.Id.ToString(),
+                        student.Email,
+                        student.Address,
+                        student.NameParent,
+                        student.Gender,
+                        student.ParentNumberPhone
+                    } : null,
+                    AccountInfo = account != null ? new
+                    {
+                        AccountId = account.AccountId.ToString(),
+                        account.UserName,
+                        account.UserCode,
+                        account.NumberPhone,
+                        account.Roles,
+
+                        account.Status
+                    } : null,
+                    Status = register.Status
+                });
             }
 
-            // Cập nhật trạng thái thành Inactive
-            foreach (var registration in expiredRegistrations)
-            {
-                registration.status = OperatingStatusEnum.inactive;
-            }
-
-            await _context.SaveChangesAsync();
-
-            return Ok($"Đã cập nhật {expiredRegistrations.Count} đăng ký thành Inactive.");
+            return Ok(result);
         }
 
-        [HttpGet("get-all-registers")]
-        public async Task<IActionResult> GetAllRegisters()
+        [HttpGet("students-paybill/{idRoom}")]
+        public async Task<IActionResult> GetStudentsPayBill(string idRoom)
         {
-            var registers = await _context.RegisterRoom
-                .Include(r => r.InfoStudent)  // Lấy thông tin User
-                .Include(r => r.InfoRoom)  // Lấy thông tin Room
-                .ThenInclude(r => r.Building) // Nếu muốn lấy thông tin tòa nhà
-                .Select(r => new
-                {
-                    idRegister = r.IdRegister,
-                    idUser = r.idStudent,
-                    idRoom = r.idRoom,
-                    idRegistrationPeriod = r.idRegistrationPeriod,
-                    startDate = r.startDate,
-                    endDate = r.endDate,
-                    total = r.total,
-                    paymentStatus = r.paymentStatus,
-                    status = r.status,
-                    
-                })
-                .ToListAsync();
+            if (!ObjectId.TryParse(idRoom, out var roomId))
+                return BadRequest(new { message = "IdRoom không hợp lệ." });
 
-            if (!registers.Any())
+            // Lấy danh sách đăng ký của phòng đó
+            var filter = Builders<RegisterRoomModels>.Filter.And(
+                Builders<RegisterRoomModels>.Filter.Eq(r => r.IdRoom, roomId),
+                Builders<RegisterRoomModels>.Filter.In(r => r.Status, new[] { OperatingStatusEnum.active, OperatingStatusEnum.wait })
+            );
+
+            var registerRooms = await _registerRoomCollection.Find(filter).ToListAsync();
+
+            var result = new List<object>();
+
+            var registeredStudentIds = registerRooms.Select(r => r.IdStudent).ToList();
+
+            // Lấy thông tin sinh viên đã đăng ký phòng này
+            foreach (var register in registerRooms)
             {
-                return NotFound("Không có dữ liệu đăng ký.");
+                var student = await _infoStudents.Find(s => s.Id == register.IdStudent).FirstOrDefaultAsync();
+                var account = student != null
+                    ? await _accounts.Find(a => a.AccountId == student.AccountId).FirstOrDefaultAsync()
+                    : null;
+
+                result.Add(new
+                {
+                    IsInRoom = true,
+                    IdRegister = register.IdRegister.ToString(),
+                    IdRoom = register.IdRoom.ToString(),
+                    IdStudent = register.IdStudent.ToString(),
+                    StudentInfo = student != null ? new
+                    {
+                        Id = student.Id.ToString(),
+                        student.Email,
+                        student.Address,
+                        student.NameParent,
+                        student.Gender,
+                        student.ParentNumberPhone
+                    } : null,
+                    AccountInfo = account != null ? new
+                    {
+                        AccountId = account.AccountId.ToString(),
+                        account.UserName,
+                        account.UserCode,
+                        account.NumberPhone,
+                        account.Roles,
+                        account.Status
+                    } : null,
+                    Status = 0 // là sinh viên phòng đó
+                });
+            }
+            var remainingStudentsFilter = Builders<InfoStudentModels>.Filter.Nin(s => s.Id, registeredStudentIds);
+            var remainingStudents = await _infoStudents.Find(remainingStudentsFilter).ToListAsync();
+
+            foreach (var student in remainingStudents)
+            {
+                var account = await _accounts.Find(a => a.AccountId == student.AccountId).FirstOrDefaultAsync();
+
+                result.Add(new
+                {
+                    IsInRoom = false,
+                    IdRegister = (string)null,
+                    IdRoom = (string)null,
+                    IdStudent = student.Id.ToString(),
+                    StudentInfo = new
+                    {
+                        Id = student.Id.ToString(),
+                        student.Email,
+                        student.Address,
+                        student.NameParent,
+                        student.Gender,
+                        student.ParentNumberPhone
+                    },
+                    AccountInfo = account != null ? new
+                    {
+                        AccountId = account.AccountId.ToString(),
+                        account.UserName,
+                        account.UserCode,
+                        account.NumberPhone,
+                        account.Roles,
+                        account.Status
+                    } : null,
+                    Status = 1 // không phải sinh viên phòng đó
+                });
             }
 
-            return Ok(registers);
-        }
-
-
-
-        [HttpGet("get-active-registers")]
-        public async Task<IActionResult> GetActiveRegisters()
-        {
-            var activeRegisters = await _context.RegisterRoom
-                .Where(r => r.status == OperatingStatusEnum.active) // Lọc các đăng ký đang hoạt động
-                .Select(r => new
-                {
-                    idRegister = r.IdRegister,
-                    idUser = r.idStudent,
-                    idRoom = r.idRoom,
-                    idRegistrationPeriod = r.idRegistrationPeriod,
-                    startDate = r.startDate,
-                    endDate = r.endDate,
-                    actionDate = r.ActionDate,
-                    total = r.total,
-                    paymentStatus = r.paymentStatus,
-                    status = r.status
-                })
-                .ToListAsync();
-
-            if (!activeRegisters.Any())
-            {
-                return NotFound("Danh sách rỗng");
-            }
-
-            return Ok(activeRegisters);
-        }
-
-        [HttpGet("get-active-registers-byIdRoom/{idRoom}")]
-        public async Task<IActionResult> GetActiveRegistersByRoom(int idRoom)
-        {
-            var activeRegisters = await _context.RegisterRoom
-.Where(r =>
-    (r.status == OperatingStatusEnum.active || r.status == OperatingStatusEnum.wait)
-    && r.idRoom == idRoom)
-                .Select(r => new
-                {
-                    idRegister = r.IdRegister,
-                    idUser = r.idStudent,
-                    idRoom = r.idRoom,
-                    idRegistrationPeriod = r.idRegistrationPeriod,
-                    startDate = r.startDate,
-                    endDate = r.endDate,
-                    actionDate = r.ActionDate,
-                    total = r.total,
-                    paymentStatus = r.paymentStatus,
-                    status = r.status
-                })
-                .ToListAsync();
-
-            if (!activeRegisters.Any())
-            {
-                return NotFound($"Không có đăng ký nào cho phòng ID {idRoom}.");
-            }
-
-            return Ok(activeRegisters);
-        }
-
-        [HttpGet("get-active-registers-byIdUser/{idUser}")]
-        public async Task<IActionResult> GetActiveRegistersByUser(int idUser)
-        {
-            var activeRegisters = await _context.RegisterRoom
-                .Where(r => r.status == OperatingStatusEnum.active && r.idStudent == idUser) // Lọc theo status và idUser
-                .Select(r => new
-                {
-                    idRegister = r.IdRegister,
-                    idUser = r.idStudent,
-                    idRoom = r.idRoom,
-                    startDate = r.startDate,
-                    endDate = r.endDate,
-                    actionDate = r.ActionDate,
-                    total = r.total,
-                    paymentStatus = r.paymentStatus,
-                    status = r.status
-                })
-                .ToListAsync();
-
-            if (!activeRegisters.Any())
-            {
-                return NotFound($"Không có đăng ký nào cho người dùng ID {idUser}.");
-            }
-
-            return Ok(activeRegisters);
-        }
-
-        [HttpGet("get-registers-byUser/{idUser}")]
-        public async Task<IActionResult> GetRegistersByUser(int idUser)
-        {
-            var registers = await _context.RegisterRoom
-                .Where(r => r.idStudent == idUser)
-                .Include(r => r.InfoRoom) // Lấy thông tin phòng
-                .ThenInclude(room => room.Building) // Lấy thông tin tòa nhà
-                .Select(r => new
-                {
-                    idRegister = r.IdRegister,
-                    idUser = r.idStudent,
-                    idRoom = r.idRoom,
-                    startDate = r.startDate,
-                    endDate = r.endDate,
-                    actionDate = r.ActionDate,
-                    total = r.total,
-                    paymentStatus = r.paymentStatus,
-                    status = r.status,
-                    roomName = r.InfoRoom.RoomName, // Tên phòng
-                    buildingName = r.InfoRoom.Building.NameBuilding // Tên tòa nhà
-                })
-                .ToListAsync();
-
-            if (!registers.Any())
-            {
-                return NotFound("Không có đăng ký nào.");
-            }
-
-            return Ok(registers);
-        }
-
-
-
-        [HttpGet("get-all-registers-byIdRoom/{idRoom}")]
-        public async Task<IActionResult> GetAllRegistersByRoom(int idRoom)
-        {
-            var activeRegisters = await _context.RegisterRoom
-                .Where(r => r.idRoom == idRoom) // Lọc theo status và idRoom
-                .Select(r => new
-                {
-                    idRegister = r.IdRegister,
-                    idUser = r.idStudent,
-                    idRoom = r.idRoom,
-                    startDate = r.startDate,
-                    endDate = r.endDate,
-                    total = r.total,
-                    paymentStatus = r.paymentStatus,
-                    status = r.status
-                })
-                .ToListAsync();
-
-            if (!activeRegisters.Any())
-            {
-                return NotFound($"Không có đăng ký nào cho phòng ID {idRoom}.");
-            }
-
-            return Ok(activeRegisters);
-        }
-
-
-        [HttpPut("update-status-payment/{idRegister}/{newPaymentStatus}")]
-        public async Task<IActionResult> UpdateStatusByPayment(int idRegister, int newPaymentStatus)
-        {
-            try
-            {
-                var registerRoom = await _context.RegisterRoom.FindAsync(idRegister);
-                if (registerRoom == null)
-                {
-                    return NotFound(new { message = $"Không tìm thấy đăng ký có ID {idRegister}." });
-                }
-                if(newPaymentStatus == 0)
-                {
-                    registerRoom.paymentStatus = PaymentStatusEnum.paid;
-                    registerRoom.status = OperatingStatusEnum.active;
-                }else
-                if (newPaymentStatus == 1)
-                {
-                    registerRoom.paymentStatus = PaymentStatusEnum.unpaid;
-                    registerRoom.status = OperatingStatusEnum.wait;
-                }
-                else if (newPaymentStatus == 2)
-                {
-                    registerRoom.paymentStatus = PaymentStatusEnum.cancel;
-                    registerRoom.status = OperatingStatusEnum.blocked;
-                }
-
-
-                await _context.SaveChangesAsync();
-
-                return Ok(new { message = "Cập nhật trạng thái đăng ký thành công.", status = registerRoom.status });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            return Ok(result);
         }
 
     }
-
 }

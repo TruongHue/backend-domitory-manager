@@ -1,37 +1,36 @@
-﻿using API_dormitory.Models.Rooms;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel.DataAnnotations;
+﻿using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+using API_dormitory.Models.Rooms;
 using API_dormitory.Models.common;
 
 namespace API_dormitory.Models.Bills
 {
     public class RoomBillModels
     {
-        [Key]
-        [Column("idRoomBill")]
-        public int IdRoomBill { get; set; }
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public ObjectId IdRoomBill { get; set; }  // MongoDB sử dụng ObjectId dạng string
 
-        [Required]
-        [ForeignKey("InfoRoom")]
-        [Column("idRoom")]
-        public int IdRoom { get; set; }
-        [Required]
-        [Column("dailyPrice", TypeName = "decimal(18,2)")]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public ObjectId IdRoom { get; set; } // Liên kết tới phòng
+
+        [BsonRequired]
+        [BsonElement("dailyPrice")]
         public decimal DailyPrice { get; set; }
-        [Required]
-        [Column("priceYear", TypeName = "decimal(18,2)")]
+
+        [BsonRequired]
+        [BsonElement("priceYear")]
         public decimal PriceYear { get; set; }
-        [Required]
-        [Column("dateOfRecord")]
+
+        [BsonRequired]
+        [BsonElement("dateOfRecord")]
         public DateTime DateOfRecord { get; set; }
 
-        [Required]
-        [Column("status")]
+        [BsonRequired]
+        [BsonElement("status")]
         public OperatingStatusEnum Status { get; set; }
 
-        // Quan hệ: Một hóa đơn thuộc về một phòng
-        public virtual InfoRoomModels InfoRoom { get; set; }
+        [BsonIgnore]
+        public virtual InfoRoomModels InfoRoom { get; set; } // Không lưu trực tiếp trong MongoDB
     }
-
-
 }

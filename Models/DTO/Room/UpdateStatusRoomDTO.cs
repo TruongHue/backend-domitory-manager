@@ -5,7 +5,7 @@ namespace API_dormitory.Models.DTO.Room
 {
     public class UpdateStatusRoomDTO
     {
-        public int IdRoom { get; set; }
+        public string IdRoom { get; set; }
         public OperatingStatusEnum? Status { get; set; }
     }
 }

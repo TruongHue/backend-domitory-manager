@@ -1,111 +1,178 @@
-﻿using API_dormitory.Data;
-using API_dormitory.Models.common;
-using API_dormitory.Models.DTO.Building;
+﻿using API_dormitory.Models.Rooms;
 using API_dormitory.Models.DTO.Room;
-using API_dormitory.Models.Rooms;
-using API_dormitory.Models.Users;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
+using API_dormitory.Models.DTO.Building;
+using API_dormitory.Data;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
+using MongoDB.Bson;
+using API_dormitory.Models.common;
 using Microsoft.IdentityModel.Tokens;
+using System.Linq;
+using API_dormitory.Models.Bills;
+using API_dormitory.Models.registerRoom;
+
 namespace API_dormitory.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
     public class RoomController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IMongoCollection<RoomBillModels> _roomBillCollection;
+        private readonly IMongoCollection<PriceWaterAndElectricity> _priceCollection;
+        private readonly IMongoCollection<InfoRoomModels> _roomsCollection;
+        private readonly IMongoCollection<BuildingModels> _buildingsCollection;
+        private readonly IMongoCollection<RegisterRoomModels> _registerRoomCollection;
 
-        public RoomController(AppDbContext context)
+        public RoomController(MongoDbContext database)
         {
-            _context = context;
-        }
+            _roomBillCollection = database.GetCollection<RoomBillModels>("RoomBills");
+            _roomsCollection = database.GetCollection<InfoRoomModels>("Rooms");
+            _buildingsCollection = database.GetCollection<BuildingModels>("Buildings");
+            _registerRoomCollection = database.GetCollection<RegisterRoomModels>("RegisterRoom");
 
-        // 🔹 Lấy toàn bộ danh sách phòng
+        }
         [HttpGet]
+
         public async Task<IActionResult> GetAllRooms()
         {
-            var rooms = await _context.InfoRoom
-                .Include(x => x.Building)
-                .Select(r => new InfoRoomDTOs
-                {
-                    IdRoom = r.IdRoom,
-                    IdBuilding = r.IdBuilding,
-                    Gender = r.Gender,
-                    RoomName = r.RoomName,
-                    NumberOfBed = r.NumberOfBed,
-                    Status = r.Status,
-                    Building = new BuildingDTOs
-                    {
-                        IdBuilding = r.Building.IdBuilding,
-                        NameBuilding = r.Building.NameBuilding,
-                        Status = r.Building.Status,
-                        Description = r.Building.Description
-                        
-                    }
-                })
-                .ToListAsync();
+            var rooms = await _roomsCollection.Find(_ => true).ToListAsync();
 
-            return Ok(rooms);
+            // Lấy danh sách IdBuilding từ các phòng
+            var buildingIds = rooms.Select(r => r.IdBuilding).Distinct().ToList();
+            var buildingFilter = Builders<BuildingModels>.Filter.In("_id", buildingIds);
+            var buildings = await _buildingsCollection.Find(buildingFilter).ToListAsync();
+
+            // Tạo dictionary để tra cứu nhanh thông tin tòa nhà
+            var buildingDict = buildings.ToDictionary(b => b.Id.ToString(), b => b);
+
+            // Lấy danh sách IdRoom từ các phòng
+            var roomIds = rooms.Select(r => r.IdRoom).ToList();
+
+            // Lọc hóa đơn có trạng thái Active (hoạt động)
+            var billFilter = Builders<RoomBillModels>.Filter.In("IdRoom", roomIds) &
+                             Builders<RoomBillModels>.Filter.Eq("Status", OperatingStatusEnum.active);
+            var roomBills = await _roomBillCollection.Find(billFilter).ToListAsync();
+
+            // Gom nhóm hóa đơn theo từng phòng
+            var roomBillDict = roomBills
+                .GroupBy(rb => rb.IdRoom)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.OrderByDescending(rb => rb.DateOfRecord)
+                          .Select(rb => new
+                          {
+                              IdRoomBill = rb.IdRoomBill.ToString(),
+                              PriceYear = rb.PriceYear,
+                              DailyPrice = rb.DailyPrice,
+                              DateOfRecord = rb.DateOfRecord,
+                              Status = rb.Status
+                          }).FirstOrDefault()
+                );
+
+            // Lọc số lượng người đăng ký theo trạng thái `active` hoặc `wait`
+            var registerFilter = Builders<RegisterRoomModels>.Filter.In("IdRoom", roomIds) &
+                                 Builders<RegisterRoomModels>.Filter.In("Status", new[] { OperatingStatusEnum.active, OperatingStatusEnum.wait });
+            var registerRooms = await _registerRoomCollection.Find(registerFilter).ToListAsync();
+
+            // Nhóm số lượng đăng ký theo phòng
+            var registerRoomDict = registerRooms
+                .GroupBy(r => r.IdRoom)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            // Trả về danh sách phòng kèm hóa đơn active và số lượng người đăng ký
+            return Ok(rooms.Select(b => new
+            {
+                Id = b.IdRoom.ToString(),
+                b.RoomName,
+                b.Gender,
+                b.NumberOfBed,
+                b.Status,
+
+                // Thông tin tòa nhà
+                Building = buildingDict.TryGetValue(b.IdBuilding.ToString(), out var building) ? new
+                {
+                    Id = building.Id.ToString(),
+                    building.NameBuilding,
+                    building.Description,
+                    building.Status
+                } : null,
+
+                // Danh sách hóa đơn active (nếu có)
+                RoomBills = roomBillDict.TryGetValue(b.IdRoom, out var bill)
+                    ? new List<dynamic> { bill }
+                    : new List<dynamic>(),
+
+                // Số lượng người đăng ký có trạng thái active hoặc wait
+                NumberOfRegistrations = registerRoomDict.TryGetValue(b.IdRoom, out var count) ? count : 0
+            }));
         }
 
-        // 🔹 Lấy thông tin phòng theo ID
+
         [HttpGet("by-id/{id}")]
-        public async Task<IActionResult> GetRoomById(int id)
+        public async Task<IActionResult> GetRoomById(string id)
         {
-            var room = await _context.InfoRoom
-                .Include(x => x.Building)
-                .Where(r => r.IdRoom == id)
-                .Select(r => new InfoRoomDTOs
-                {
-                    IdRoom = r.IdRoom,
-                    Gender = r.Gender,
-                    IdBuilding = r.IdBuilding,
-                    RoomName = r.RoomName,
-                    NumberOfBed = r.NumberOfBed,
-                    Status = r.Status,
-                    Building = new BuildingDTOs
-                    {
-                        IdBuilding = r.Building.IdBuilding,
-                        NameBuilding = r.Building.NameBuilding,
-                        Status = r.Building.Status,
-                        Description = r.Building.Description
+            if (!ObjectId.TryParse(id, out var objectId))
+                return BadRequest(new { message = "ID không hợp lệ" });
 
-                    }
-                })
-                .FirstOrDefaultAsync();
-
+            var room = await _roomsCollection.Find(r => r.IdRoom == objectId).FirstOrDefaultAsync();
             if (room == null)
                 return NotFound(new { message = "Không tìm thấy phòng" });
 
-            return Ok(room);
+            // Lấy thông tin tòa nhà tương ứng
+            var building = await _buildingsCollection.Find(b => b.IdBuilding == room.IdBuilding).FirstOrDefaultAsync();
+
+            // Đếm số lượng đăng ký có trạng thái active hoặc wait
+            var activeCount = await _registerRoomCollection.CountDocumentsAsync(r => r.IdRoom == objectId && r.Status == OperatingStatusEnum.active);
+            var waitCount = await _registerRoomCollection.CountDocumentsAsync(r => r.IdRoom == objectId && r.Status == OperatingStatusEnum.wait);
+
+            return Ok(new
+            {
+                Id = room.IdRoom.ToString(),
+                room.RoomName,
+                room.Gender,
+                room.NumberOfBed,
+                room.Status,
+
+                // Thêm số lượng đăng ký active và wait
+                RegisterCounts = new
+                {
+                    Active = activeCount,
+                    Wait = waitCount,
+                    Total = activeCount + waitCount
+                },
+
+                Building = building != null ? new
+                {
+                    Id = building.Id.ToString(),
+                    building.NameBuilding,
+                    building.Description,
+                    building.Status
+                } : null
+            });
         }
 
         // 🔹 Lấy danh sách phòng theo ID tòa nhà
         [HttpGet("by-building/{idBuilding}")]
-        public async Task<IActionResult> GetRoomsByBuilding(int idBuilding)
+        public async Task<IActionResult> GetRoomsByBuilding(string idBuilding)
         {
-            var rooms = await _context.InfoRoom
-                .Where(r => r.IdBuilding == idBuilding)
-                .Select(r => new InfoRoomDTOs
-                {
-                    IdRoom = r.IdRoom,
-                    IdBuilding = r.IdBuilding,
-                    Gender = r.Gender,
-                    RoomName = r.RoomName,
-                    NumberOfBed = r.NumberOfBed,
-                    Status = r.Status
-                })
-                .ToListAsync();
+            if (!ObjectId.TryParse(idBuilding, out var objectId))
+                return BadRequest(new { message = "ID tòa nhà không hợp lệ" });
 
-            if (rooms.Count == 0)
+            var rooms = await _roomsCollection.Find(r => r.IdBuilding == objectId).ToListAsync();
+            if (rooms == null || rooms.Count == 0)
                 return NotFound(new { message = "Không có phòng nào trong tòa nhà này" });
 
-            return Ok(rooms);
+            return Ok(rooms.Select(room => new
+            {
+                Id = room.IdRoom.ToString(),
+                room.RoomName,
+                room.Gender,
+                room.NumberOfBed,
+                room.Status
+            }));
         }
 
-        // 🔹 Thêm mới một phòng
+        // 🔹 Thêm phòng mới
         [HttpPost]
         public async Task<IActionResult> CreateRoom([FromBody] AddRoomDTO newRoom)
         {
@@ -114,121 +181,99 @@ namespace API_dormitory.Controllers
 
             if (newRoom.NumberOfBed == null || newRoom.NumberOfBed < 1)
                 return BadRequest(new { message = "Số giường phải lớn hơn 0" });
-
-            // Kiểm tra tòa nhà có tồn tại không
-            var building = await _context.Buildings.FirstOrDefaultAsync(b => b.IdBuilding == newRoom.IdBuilding);
+            var objectId = ObjectId.Parse(newRoom.IdBuilding);
+            var building = await _buildingsCollection.Find(b => b.IdBuilding == objectId).FirstOrDefaultAsync();
             if (building == null)
                 return BadRequest(new { message = "Tòa nhà không tồn tại" });
 
             var room = new InfoRoomModels
             {
-                IdBuilding = (int)newRoom.IdBuilding,
+                IdRoom = ObjectId.GenerateNewId(),
+                IdBuilding = objectId,
                 Gender = newRoom.Gender,
                 RoomName = newRoom.RoomName,
                 NumberOfBed = newRoom.NumberOfBed.Value,
                 Status = newRoom.Status ?? OperatingStatusEnum.active
             };
 
-            _context.InfoRoom.Add(room);
-            await _context.SaveChangesAsync();
+            await _roomsCollection.InsertOneAsync(room);
 
-            // Trả về thông tin phòng vừa tạo, bao gồm cả thông tin tòa nhà
-            var createdRoom = new InfoRoomDTOs
+            var roomBill = new RoomBillModels
             {
-                IdRoom = room.IdRoom,
-                IdBuilding = room.IdBuilding,
-                RoomName = room.RoomName,
-                Gender = room.Gender,
-                NumberOfBed = room.NumberOfBed,
-                Status = room.Status,
-                Building = new BuildingDTOs
-                {
-                    IdBuilding = building.IdBuilding,
-                    NameBuilding = building.NameBuilding,
-                    Status = building.Status,
-                    Description = building.Description
-                }
+                IdRoomBill = ObjectId.GenerateNewId(),
+                IdRoom = room.IdRoom, // Lấy ID phòng vừa tạo
+                DailyPrice = newRoom.DailyPrice, // Nếu không có thì mặc định 0
+                PriceYear = newRoom.PriceYear,   // Nếu không có thì mặc định 0
+                DateOfRecord = DateTime.UtcNow,       // Ngày tạo hóa đơn
+                Status = OperatingStatusEnum.active   // Hóa đơn mới luôn Active
             };
 
-            return CreatedAtAction(nameof(GetRoomById), new { id = room.IdRoom }, createdRoom);
-        }
+            await _roomBillCollection.InsertOneAsync(roomBill);
 
+            return Ok(new { message = "Tạo phòng thành công!" });
+        }
 
         // 🔹 Cập nhật thông tin phòng
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateRoom(int id, [FromBody] InfoRoomDTOs updateRoom)
+        public async Task<IActionResult> UpdateRoom(string id, [FromBody] InfoRoomDTOs updateRoom)
         {
-            var room = await _context.InfoRoom.FindAsync(id);
+            var objectId = ObjectId.Parse(id);
+            var room = await _roomsCollection.Find(r => r.IdRoom == objectId).FirstOrDefaultAsync();
             if (room == null)
                 return NotFound(new { message = "Không tìm thấy phòng" });
 
-            if (updateRoom.IdBuilding.HasValue)
+            var updateDefinition = Builders<InfoRoomModels>.Update
+                .Set(r => r.RoomName, updateRoom.RoomName ?? room.RoomName)
+                .Set(r => r.Gender, updateRoom.Gender)
+                .Set(r => r.NumberOfBed, updateRoom.NumberOfBed ?? room.NumberOfBed)
+                .Set(r => r.Status, updateRoom.Status ?? room.Status);
+
+            if (!string.IsNullOrEmpty(updateRoom.IdBuilding))
             {
-                // Kiểm tra tòa nhà có tồn tại không trước khi cập nhật
-                var buildingExists = await _context.Buildings.AnyAsync(b => b.IdBuilding == updateRoom.IdBuilding);
+                var objectId1 = ObjectId.Parse(updateRoom.IdBuilding);
+                var buildingExists = await _buildingsCollection.Find(b => b.IdBuilding == objectId1).AnyAsync();
                 if (!buildingExists)
                     return BadRequest(new { message = "Tòa nhà không tồn tại" });
 
-                room.IdBuilding = updateRoom.IdBuilding.Value;
+                updateDefinition = updateDefinition.Set(r => r.IdBuilding, objectId1);
             }
-
-            if (!string.IsNullOrEmpty(updateRoom.RoomName))
-                room.RoomName = updateRoom.RoomName;
-
-            if (updateRoom.NumberOfBed.HasValue)
-                room.NumberOfBed = updateRoom.NumberOfBed.Value;
-
-            if (updateRoom.Status.HasValue)
-                room.Status = updateRoom.Status.Value;
-
-            await _context.SaveChangesAsync();
+            var objectId2 = ObjectId.Parse(id);
+            await _roomsCollection.UpdateOneAsync(r => r.IdRoom == objectId2, updateDefinition);
             return Ok(new { message = "Cập nhật phòng thành công" });
         }
 
+        // 🔹 Cập nhật trạng thái phòng
         [HttpPut("status")]
         public async Task<IActionResult> UpdateRoomStatus([FromBody] UpdateStatusRoomDTO status)
         {
-            try
-            {
-                var room = await _context.InfoRoom.FindAsync(status.IdRoom);
-                if (room == null)
-                    return NotFound(new { message = "Không tìm thấy phòng" });
-
-                // Lấy tòa nhà chứa phòng này
-                var building = await _context.Buildings.FindAsync(room.IdBuilding);
-                if (building == null)
-                    return NotFound(new { message = "Không tìm thấy tòa nhà chứa phòng này" });
-                Console.WriteLine($"DEBUG - Trạng thái tòa nhà: {building.Status} ({(int)building.Status})");
-                // Kiểm tra trạng thái của tòa nhà
-                if ((int)building.Status == 1)  // 1 là inactive
-                {
-                    return BadRequest(new { message = "Tòa nhà đang Inactive, không thể cập nhật trạng thái phòng." });
-                }
-
-                // Nếu tòa nhà Active thì mới cho cập nhật phòng
-                room.Status = (OperatingStatusEnum)status.Status;
-                await _context.SaveChangesAsync();
-
-                return Ok(new { message = "Cập nhật trạng thái phòng thành công" });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Lỗi Server", error = ex.Message });
-            }
-        }
-
-
-
-        // 🔹 Xóa phòng
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteRoom(int id)
-        {
-            var room = await _context.InfoRoom.FindAsync(id);
+            var objectId = ObjectId.Parse(status.IdRoom);
+            var room = await _roomsCollection.Find(r => r.IdRoom == objectId).FirstOrDefaultAsync();
             if (room == null)
                 return NotFound(new { message = "Không tìm thấy phòng" });
 
-            _context.InfoRoom.Remove(room);
-            await _context.SaveChangesAsync();
+            var building = await _buildingsCollection.Find(b => b.IdBuilding == room.IdBuilding).FirstOrDefaultAsync();
+            if (building == null)
+                return NotFound(new { message = "Không tìm thấy tòa nhà chứa phòng này" });
+
+            if (building.Status == OperatingStatusEnum.inactive)
+                return BadRequest(new { message = "Tòa nhà đang Inactive, không thể cập nhật trạng thái phòng." });
+
+            var update = Builders<InfoRoomModels>.Update.Set(r => r.Status, (OperatingStatusEnum)status.Status);
+
+            await _roomsCollection.UpdateOneAsync(r => r.IdRoom == objectId, update);
+
+            return Ok(new { message = "Cập nhật trạng thái phòng thành công" });
+        }
+
+        // 🔹 Xóa phòng
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteRoom(string id)
+        {
+            var objectId = ObjectId.Parse(id);
+            var result = await _roomsCollection.DeleteOneAsync(r => r.IdRoom == objectId);
+            if (result.DeletedCount == 0)
+                return NotFound(new { message = "Không tìm thấy phòng" });
+
             return Ok(new { message = "Xóa phòng thành công" });
         }
     }

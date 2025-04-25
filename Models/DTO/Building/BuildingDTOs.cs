@@ -8,7 +8,7 @@ namespace API_dormitory.Models.DTO.Building
 {
     public class BuildingDTOs
     {
-        public int? IdBuilding { get; set; }
+        public string? IdBuilding { get; set; }
         public string? NameBuilding { get; set; }
         public string? Description { get; set; }
         public OperatingStatusEnum? Status { get; set; }

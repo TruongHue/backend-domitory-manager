@@ -5,7 +5,7 @@ namespace API_dormitory.Models.DTO.Building
 {
     public class UpdateStatusBuildingDTO
     {
-        public int IdBuilding { get; set; }
+        public string IdBuilding { get; set; }
         public OperatingStatusEnum? Status { get; set; }
     }
 }

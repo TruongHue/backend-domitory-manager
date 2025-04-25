@@ -1,44 +1,45 @@
 ﻿using API_dormitory.Models.common;
-using API_dormitory.Models.common;
-using API_dormitory.Models.Rooms;
-using API_dormitory.Models.Users;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+using System;
 
 namespace API_dormitory.Models.registerRoom
 {
+    [BsonIgnoreExtraElements] // Bỏ qua các trường không có trong model
     public class RegisterRoomModels
     {
-        [Key]
-        public int IdRegister { get; set; }
-        [Required]
-        [ForeignKey("idStudent")]
-        public int idStudent { get; set; }
-        [Required]
-        [ForeignKey("idRoom")]
-        public int idRoom { get; set; }
-        [Required]
-        [ForeignKey("idRegistrationPeriod")]
-        public int idRegistrationPeriod { get; set; }
-        [Required]
-        public DateTime startDate { get; set; }
-        [Required]
-        public DateTime endDate { get; set; }
-        [Required]
-        [Column("actionDate")]
-        public DateTime ActionDate { get; set; }
-        [Required]
-        [Column("price", TypeName = "decimal(18,2)")]
-        public decimal total { get; set; }
-        [Required]
-        public PaymentStatusEnum paymentStatus { get; set; }
-        [Required] 
-        public OperatingStatusEnum status { get; set; }
-        public virtual InfoStudentModels InfoStudent { get; set; }
-        public virtual InfoRoomModels InfoRoom { get; set; }
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public ObjectId IdRegister { get; set; } // ID MongoDB dạng ObjectId
 
+        [BsonElement("idStudent")]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public ObjectId IdStudent { get; set; } // Nếu lưu dưới dạng ObjectId
 
+        [BsonElement("idRoom")]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public ObjectId IdRoom { get; set; }
+
+        [BsonElement("idRegistrationPeriod")]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public ObjectId IdRegistrationPeriod { get; set; }
+
+        [BsonElement("startDate")]
+        public DateTime StartDate { get; set; }
+
+        [BsonElement("endDate")]
+        public DateTime EndDate { get; set; }
+
+        [BsonElement("actionDate")]
+        public DateTime ActionDate { get; set; } = DateTime.UtcNow;
+
+        [BsonElement("total")]
+        public double Total { get; set; } // Chuyển `decimal` → `double` cho MongoDB
+
+        [BsonElement("paymentStatus")]
+        public PaymentStatusEnum PaymentStatus { get; set; }
+
+        [BsonElement("status")]
+        public OperatingStatusEnum Status { get; set; }
     }
-
-
 }

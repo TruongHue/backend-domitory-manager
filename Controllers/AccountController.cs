@@ -17,6 +17,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using CloudinaryDotNet;
+using API_dormitory.Models.DTO.User;
+using OfficeOpenXml.Drawing;
+using OfficeOpenXml;
 
 
 namespace API_dormitory.Controllers
@@ -28,42 +32,57 @@ namespace API_dormitory.Controllers
         private readonly IConfiguration _configuration;
         private readonly IMongoCollection<AccountModels> _accounts;
         private readonly IMongoCollection<InfoStudentModels> _infoStudents;
+        private readonly EmailService _emailService;
 
-        public AccountController(IConfiguration configuration, MongoDbContext context)
+
+        public AccountController(IConfiguration configuration, MongoDbContext context, EmailService emailService)
         {
             _configuration = configuration;
             _accounts = context.GetCollection<AccountModels>("Accounts");
             _infoStudents = context.GetCollection<InfoStudentModels>("InfoStudents");
+            _emailService = emailService;
+
         }
 
-        [HttpGet("active-accounts")]
+        [HttpGet("active-account-students")]
         public async Task<IActionResult> GetActiveAccounts()
         {
             var students = await _infoStudents.Find(_ => true).ToListAsync();
             var accounts = await _accounts.Find(_ => true).ToListAsync();
 
-            var result = students.Select(student => new
+            var result = students.Select(student =>
             {
-                Id = student.Id.ToString(), // Chuyển ObjectId thành string
-                student.Email,
-                student.Gender,
-                student.Picture,
-                student.NameParent,
-                student.Address,
-                student.ParentNumberPhone,
+                var account = accounts.FirstOrDefault(acc => acc.AccountId == student.AccountId
+                                                              && acc.Status == OperatingStatusEnum.active
+                                                              && acc.Roles == RoleTypeStatusEnum.Student);
+                return account != null ? new
+                {
+                    // Hiển thị thông tin tài khoản trước
+                    Account = new
+                    {
+                        AccountId = account.AccountId.ToString(),
+                        account.UserName,
+                        account.UserCode,
+                        account.NumberPhone,
+                        account.Roles,
+                        account.Status
+                    },
 
-                // Chỉ lấy các trường cần thiết từ Account
-                Account = accounts.Where(acc => acc.AccountId == student.AccountId)
-                                  .Select(acc => new
-                                  {
-                                      acc.UserName,
-                                      acc.UserCode,
-                                      acc.NumberPhone,
-                                      acc.Roles,
-                                      acc.Status
-                                  })
-                                  .FirstOrDefault() // Lấy 1 tài khoản duy nhất
-            }).ToList();
+                    // Sau đó hiển thị thông tin sinh viên
+                    InfoStudent = new
+                    {
+                        Id = student.Id.ToString(),
+                        student.Email,
+                        student.Gender,
+                        student.Picture,
+                        student.NameParent,
+                        student.Address,
+                        student.ParentNumberPhone
+                    }
+                } : null;
+            })
+            .Where(result => result != null) // Loại bỏ student không có tài khoản hợp lệ
+            .ToList();
 
             if (!result.Any())
             {
@@ -73,6 +92,363 @@ namespace API_dormitory.Controllers
             return Ok(result);
         }
 
+        [HttpGet("inactive-account-students")]
+        public async Task<IActionResult> GetInActiveAccounts()
+        {
+            var students = await _infoStudents.Find(_ => true).ToListAsync();
+            var accounts = await _accounts.Find(_ => true).ToListAsync();
+
+            var result = students.Select(student =>
+            {
+                var account = accounts.FirstOrDefault(acc => acc.AccountId == student.AccountId
+                                                              && acc.Status == OperatingStatusEnum.inactive
+                                                              && acc.Roles == RoleTypeStatusEnum.Student);
+                return account != null ? new
+                {
+                    // Hiển thị thông tin tài khoản trước
+                    Account = new
+                    {
+                        AccountId = account.AccountId.ToString(),
+                        account.UserName,
+                        account.UserCode,
+                        account.NumberPhone,
+                        account.Roles,
+                        account.Status
+                    },
+
+                    // Sau đó hiển thị thông tin sinh viên
+                    InfoStudent = new
+                    {
+                        Id = student.Id.ToString(),
+                        student.Email,
+                        student.Gender,
+                        student.Picture,
+                        student.NameParent,
+                        student.Address,
+                        student.ParentNumberPhone
+                    }
+                } : null;
+            })
+            .Where(result => result != null) // Loại bỏ student không có tài khoản hợp lệ
+            .ToList();
+
+            if (!result.Any())
+            {
+                return NotFound(new { message = "Không có tài khoản nào không hoạt động với vai trò sinh viên!" });
+            }
+
+            return Ok(result);
+        }
+
+        [HttpGet("blocked-account-students")]
+        public async Task<IActionResult> GetBlockedAccounts()
+        {
+            var students = await _infoStudents.Find(_ => true).ToListAsync();
+            var accounts = await _accounts.Find(_ => true).ToListAsync();
+
+            var result = students.Select(student =>
+            {
+                var account = accounts.FirstOrDefault(acc => acc.AccountId == student.AccountId
+                                                              && acc.Status == OperatingStatusEnum.blocked
+                                                              && acc.Roles == RoleTypeStatusEnum.Student);
+                return account != null ? new
+                {
+                    // Hiển thị thông tin tài khoản trước
+                    Account = new
+                    {
+                        AccountId = account.AccountId.ToString(),
+                        account.UserName,
+                        account.UserCode,
+                        account.NumberPhone,
+                        account.Roles,
+                        account.Status
+                    },
+
+                    // Sau đó hiển thị thông tin sinh viên
+                    InfoStudent = new
+                    {
+                        Id = student.Id.ToString(),
+                        student.Email,
+                        student.Gender,
+                        student.Picture,
+                        student.NameParent,
+                        student.Address,
+                        student.ParentNumberPhone
+                    }
+                } : null;
+            })
+            .Where(result => result != null) // Loại bỏ student không có tài khoản hợp lệ
+            .ToList();
+
+            if (!result.Any())
+            {
+                return NotFound(new { message = "Không có tài khoản nào bị chặn với vai trò sinh viên!" });
+            }
+
+            return Ok(result);
+        }
+
+
+        [HttpGet("wait-account-students")]
+        public async Task<IActionResult> GetWaitAccounts()
+        {
+            var students = await _infoStudents.Find(_ => true).ToListAsync();
+            var accounts = await _accounts.Find(_ => true).ToListAsync();
+
+            var result = students.Select(student =>
+            {
+                var account = accounts.FirstOrDefault(acc => acc.AccountId == student.AccountId
+                                                              && acc.Status == OperatingStatusEnum.wait
+                                                              && acc.Roles == RoleTypeStatusEnum.Student);
+                return account != null ? new
+                {
+                    // Hiển thị thông tin tài khoản trước
+                    Account = new
+                    {
+                        AccountId = account.AccountId.ToString(),
+                        account.UserName,
+                        account.UserCode,
+                        account.NumberPhone,
+                        account.Roles,
+                        account.Status
+                    },
+
+                    // Sau đó hiển thị thông tin sinh viên
+                    InfoStudent = new
+                    {
+                        Id = student.Id.ToString(),
+                        student.Email,
+                        student.Gender,
+                        student.Picture,
+                        student.NameParent,
+                        student.Address,
+                        student.ParentNumberPhone
+                    }
+                } : null;
+            })
+            .Where(result => result != null) // Loại bỏ student không có tài khoản hợp lệ
+            .ToList();
+
+            if (!result.Any())
+            {
+                return NotFound(new { message = "Không có tài khoản nào đang đợi với vai trò sinh viên!" });
+            }
+
+            return Ok(result);
+        }
+
+
+
+        [HttpGet("All-account-students")]
+        public async Task<IActionResult> GetAllAccounts()
+        {
+            var students = await _infoStudents.Find(_ => true).ToListAsync();
+            var accounts = await _accounts.Find(_ => true).ToListAsync();
+
+            var result = students.Select(student =>
+            {
+                var account = accounts.FirstOrDefault(acc => acc.AccountId == student.AccountId
+                                                              && acc.Roles == RoleTypeStatusEnum.Student);
+                return new
+                {
+                    // Hiển thị thông tin tài khoản trước
+                    Account = account != null ? new
+                    {
+                        AccountId = account.AccountId.ToString(),
+                        account.UserName,
+                        account.UserCode,
+                        account.NumberPhone,
+                        account.Roles,
+                        account.Status
+                    } : null,
+
+                    // Sau đó hiển thị thông tin học sinh
+                    InfoStudent = new
+                    {
+                        Id = student.Id.ToString(),
+                        student.Email,
+                        student.Gender,
+                        student.Picture,
+                        student.NameParent,
+                        student.Address,
+                        student.ParentNumberPhone
+                    }
+                };
+            }).ToList();
+
+            if (!result.Any())
+            {
+                return NotFound(new { message = "Không có tài khoản nào" });
+            }
+
+            return Ok(result);
+        }
+
+
+
+        [HttpGet("account-student-id/{accountId}")]
+        public async Task<IActionResult> GetAccountStudentByAccountId(string accountId)
+        {
+            var account = await _accounts.Find(acc => acc.AccountId.ToString() == accountId
+                                                      && acc.Roles == RoleTypeStatusEnum.Student)
+                                         .FirstOrDefaultAsync();
+
+            if (account == null)
+            {
+                return NotFound(new { message = "Không tìm thấy tài khoản học sinh" });
+            }
+
+            var student = await _infoStudents.Find(stu => stu.AccountId.ToString() == accountId).FirstOrDefaultAsync();
+
+            var result = new
+            {
+                // Hiển thị thông tin tài khoản trước
+                Account = new
+                {
+                    AccountId = account.AccountId.ToString(),
+                    account.UserName,
+                    account.UserCode,
+                    account.NumberPhone,
+                    account.Roles,
+                    account.Status
+                },
+
+                // Sau đó hiển thị thông tin học sinh
+                InfoStudent = new
+                {
+                    Id = student?.Id.ToString(),
+                    student?.Email,
+                    student?.Gender,
+                    student?.Picture,
+                    student?.NameParent,
+                    student?.Address,
+                    student?.ParentNumberPhone
+                }
+            };
+
+            return Ok(result);
+        }
+
+        [HttpGet("account-student-code/{StudentCode}")]
+        public async Task<IActionResult> GetAccountStudentByStudentCode(string studentCode)
+        {
+            var account = await _accounts.Find(acc => acc.UserCode == studentCode
+                                                      && acc.Roles == RoleTypeStatusEnum.Student)
+                                         .FirstOrDefaultAsync();
+
+            if (account == null)
+            {
+                return NotFound(new { message = "Không tìm thấy tài khoản học sinh" });
+            }
+
+            var student = await _infoStudents.Find(stu => stu.AccountId.ToString() == account.AccountId.ToString()).FirstOrDefaultAsync();
+
+            var result = new
+            {
+                // Hiển thị thông tin tài khoản trước
+                Account = new
+                {
+                    AccountId = account.AccountId.ToString(),
+                    account.UserName,
+                    account.UserCode,
+                    account.NumberPhone,
+                    account.Roles,
+                    account.Status
+                },
+
+                // Sau đó hiển thị thông tin học sinh
+                InfoStudent = new
+                {
+                    Id = student?.Id.ToString(),
+                    student?.Email,
+                    student?.Gender,
+                    student?.Picture,
+                    student?.NameParent,
+                    student?.Address,
+                    student?.ParentNumberPhone
+                }
+            };
+
+            return Ok(result);
+        }
+
+        [HttpGet("all-account-staffs")]
+        public async Task<IActionResult> GetAllAccountStaffs()
+        {
+            var accounts = await _accounts.Find(acc => acc.Roles == RoleTypeStatusEnum.Staff).ToListAsync();
+
+            var result = accounts.Select(acc => new
+            {
+                AccountId = acc.AccountId.ToString(),
+                acc.UserName,
+                acc.UserCode,
+                acc.NumberPhone,
+                acc.Roles,
+                acc.Status
+            }).ToList();
+
+            if (!result.Any())
+            {
+                return NotFound(new { message = "Không có tài khoản nhân viên nào" });
+            }
+
+            return Ok(result);
+        }
+
+
+        [HttpPost("account-staff")]
+        public async Task<IActionResult> CreateStaffAccount([FromBody] AccountDTOs request)
+        {
+            // 🔹 Kiểm tra xem tài khoản đã tồn tại chưa (dựa trên Email hoặc Số điện thoại)
+            var existingAccount = await _accounts.Find(acc => acc.NumberPhone == request.NumberPhone).FirstOrDefaultAsync();
+            if (existingAccount != null)
+            {
+                return BadRequest(new { message = "Tài khoản đã tồn tại!" });
+            }
+
+            // 🔹 Mã hóa mật khẩu trước khi lưu (sử dụng BCrypt hoặc thư viện bảo mật)
+            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password);
+
+            // 🔹 Tạo tài khoản mới
+            var newAccount = new AccountModels
+            {
+                AccountId = ObjectId.GenerateNewId(),
+                UserName = request.UserName,
+                UserCode = request.UserCode,
+                NumberPhone = request.NumberPhone,
+                Password = hashedPassword,
+                Roles = RoleTypeStatusEnum.Staff,  // Gán role Staff
+                Status = OperatingStatusEnum.active // Mặc định trạng thái hoạt động
+            };
+
+            // 🔹 Thêm tài khoản vào MongoDB
+            await _accounts.InsertOneAsync(newAccount);
+            return Ok(new { message = "Tạo tài khoản staff thành công!" });
+        }
+
+
+        [HttpGet("account-staff/{idAccount}")]
+        public async Task<IActionResult> GetAccountStaffById(string idAccount)
+        {
+            var account = await _accounts.Find(acc => acc.AccountId.ToString() == idAccount && acc.Roles == RoleTypeStatusEnum.Staff).FirstOrDefaultAsync();
+
+            if (account == null)
+            {
+                return NotFound(new { message = "Không tìm thấy tài khoản nhân viên" });
+            }
+
+            var result = new
+            {
+                AccountId = account.AccountId.ToString(),
+                account.UserName,
+                account.UserCode,
+                account.NumberPhone,
+                account.Roles,
+                account.Status
+            };
+
+            return Ok(result);
+        }
 
 
         // 🔹 API đăng ký tài khoản sinh viên
@@ -131,7 +507,7 @@ namespace API_dormitory.Controllers
 
             // 🔹 **Lưu thông tin sinh viên vào MongoDB**
             await _infoStudents.InsertOneAsync(infoUser);
-            ObjectId infoStudentId =ObjectId.Parse(infoUser.Id.ToString());
+            ObjectId infoStudentId = ObjectId.Parse(infoUser.Id.ToString());
 
             // 🔹 **Tạo đối tượng AccountModels**
             var account = new AccountModels
@@ -156,6 +532,85 @@ namespace API_dormitory.Controllers
 
             return Ok(new { message = "Registration successful", imageUrl = $"/images/{fileName}" });
         }
+
+        [HttpPost("import-excel")]
+        public async Task<IActionResult> ImportFromExcel(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("No file uploaded");
+
+            using var stream = new MemoryStream();
+            await file.CopyToAsync(stream);
+            using var package = new ExcelPackage(stream);
+            var worksheet = package.Workbook.Worksheets[0];
+
+            var students = new List<StudentRequestDTO>();
+            var duplicateStudents = new List<int>(); // Danh sách lưu trữ số thứ tự của các sinh viên bị trùng
+
+            // Đọc từng dòng
+            for (int row = 2; row <= worksheet.Dimension.End.Row; row++)
+            {
+                var student = new StudentRequestDTO
+                {
+                    Account = new AccountDTOs
+                    {
+                        UserName = worksheet.Cells[row, 2].Text,
+                        UserCode = worksheet.Cells[row, 3].Text,
+                        NumberPhone = worksheet.Cells[row, 4].Text,
+                        Password = worksheet.Cells[row, 3].Text,  // Mật khẩu là mã sinh viên
+                        Roles = (int)RoleTypeStatusEnum.Student,  // Đặt trạng thái tài khoản là Student
+                        Status = (int)OperatingStatusEnum.active  // Đặt trạng thái tài khoản mặc định
+                    },
+                    InfoStudent = new InfoStudentDTOs
+                    {
+                        Email = worksheet.Cells[row, 5].Text,
+                        Gender = worksheet.Cells[row, 6].Text.Trim().ToLower() == "Nam"
+                            ? GenderEnum.male
+                            : GenderEnum.female,
+                        NameParent = worksheet.Cells[row, 7].Text,
+                        ParentNumberPhone = worksheet.Cells[row, 8].Text,
+                        Address = worksheet.Cells[row, 9].Text,
+                    }
+                };
+
+                // Kiểm tra xem số điện thoại hoặc UserName đã tồn tại trong MongoDB chưa
+                var existingUser = await _accounts.Find(x => x.NumberPhone == student.Account.NumberPhone).FirstOrDefaultAsync();
+                if (existingUser != null)
+                {
+                    // Nếu đã tồn tại, lưu số thứ tự vào danh sách duplicate
+                    duplicateStudents.Add(row); // row là số thứ tự của sinh viên trong Excel (bắt đầu từ 2)
+                    continue; // Bỏ qua sinh viên này
+                }
+
+                // Lấy ảnh tại vị trí tương ứng
+                var pic = worksheet.Drawings.OfType<ExcelPicture>()
+                           .FirstOrDefault(p => p.From.Row + 1 == row);
+                if (pic != null)
+                {
+                    var imageBytes = pic.Image?.ImageBytes;
+                    student.InfoStudent.Picture = Convert.ToBase64String(imageBytes);  // Lưu ảnh dạng base64
+                }
+
+                students.Add(student);
+            }
+
+            // Lưu vào MongoDB và tạo tài khoản sinh viên cho những sinh viên không bị trùng
+            foreach (var stu in students)
+            {
+                await Register(stu, null);  // Đoạn này gọi lại hàm Register bạn đã có
+            }
+
+            // Kiểm tra nếu có sinh viên bị trùng
+            if (duplicateStudents.Count > 0)
+            {
+                // In ra số lượng và số thứ tự của các sinh viên bị trùng
+                return Ok(new { message = "Import thành công, nhưng có tài khoản bị trùng", count = students.Count, duplicates = duplicateStudents });
+            }
+
+            return Ok(new { message = "Import thành công!", count = students.Count });
+        }
+
+
 
         //Đăng nhập
         [HttpPost("login")]
@@ -225,208 +680,237 @@ namespace API_dormitory.Controllers
             return tokenHandler.WriteToken(token);
         }
 
-
-
-
-    }
-}
-
-
-
-/*        [HttpGet("inactive-accounts")]
-        public async Task<IActionResult> GetInactiveAccounts()
+        [HttpDelete("account-student/{accountId}")]
+        public async Task<IActionResult> DeleteAccountStudent(string accountId)
         {
-            var inactiveAccounts = await _context.Accounts
-                .Where(a => a.Status == OperatingStatusEnum.inactive && a.Roles == RoleTypeStatusEnum.Student) // Lọc Role = 1
-                .Include(a => a.InfoStudent) // Lấy thêm thông tin InfoUser
-                .ToListAsync();
+            var account = await _accounts.Find(acc => acc.AccountId.ToString() == accountId
+                                                      && acc.Roles == RoleTypeStatusEnum.Student)
+                                         .FirstOrDefaultAsync();
 
-            if (!inactiveAccounts.Any())
+            if (account == null)
             {
-                return NotFound(new { message = "Không có tài khoản nào chưa kích hoạt với vai trò nhân viên!" });
+                return NotFound(new { message = "Không tìm thấy tài khoản học sinh" });
             }
 
-            return Ok(inactiveAccounts);
+            // Tìm sinh viên liên kết với tài khoản
+            var student = await _infoStudents.Find(stu => stu.AccountId.ToString() == accountId).FirstOrDefaultAsync();
+
+            // Xóa tài khoản trước
+            await _accounts.DeleteOneAsync(acc => acc.AccountId == account.AccountId);
+
+            // Nếu có thông tin sinh viên, xóa luôn
+            if (student != null)
+            {
+                await _infoStudents.DeleteOneAsync(stu => stu.AccountId == account.AccountId);
+            }
+
+            return Ok(new { message = "Xóa tài khoản sinh viên thành công!" });
         }
 
-        [HttpGet("blocked-accounts")]
-        public async Task<IActionResult> GetBlockedAccounts()
+        [HttpPut("account/password/{accountId}")]
+        public async Task<IActionResult> UpdatePasswordByAdmin(string accountId, [FromBody] updatePassword request)
         {
-            var activeAccounts = await _context.Accounts
-                .Where(a => a.Status == OperatingStatusEnum.blocked && a.Roles == RoleTypeStatusEnum.Student) // Lọc Role = 1
-                .Include(a => a.InfoStudent) // Lấy thêm thông tin InfoUser
+            // 🔹 Tìm tài khoản theo AccountId
+            var account = await _accounts.Find(acc => acc.AccountId.ToString() == accountId)
+                                         .FirstOrDefaultAsync();
+
+            if (account == null)
+            {
+                return NotFound(new { message = "Không tìm thấy tài khoản!" });
+            }
+
+            // 🔹 Mã hóa mật khẩu mới
+            string hashedPassword = HashPassword(request.Password);
+
+            // 🔹 Cập nhật mật khẩu mới vào MongoDB
+            var update = Builders<AccountModels>.Update.Set(acc => acc.Password, hashedPassword);
+            await _accounts.UpdateOneAsync(acc => acc.AccountId == account.AccountId, update);
+
+            return Ok(new { message = "Cập nhật mật khẩu thành công!" });
+        }
+
+
+
+        [HttpDelete("account-staff/{accountId}")]
+        public async Task<IActionResult> DeleteAccountStaff(string accountId)
+        {
+            var account = await _accounts.Find(acc => acc.AccountId.ToString() == accountId
+                                                      && acc.Roles == RoleTypeStatusEnum.Staff)
+                                         .FirstOrDefaultAsync();
+
+            if (account == null)
+            {
+                return NotFound(new { message = "Không tìm thấy tài khoản học sinh" });
+            }
+            // Xóa tài khoản trước
+            await _accounts.DeleteOneAsync(acc => acc.AccountId == account.AccountId);
+            return Ok(new { message = "Xóa tài khoản sinh viên thành công!" });
+        }
+
+        [HttpPut("account-student/full/{accountId}")]
+        public async Task<IActionResult> UpdateFullStudentInfo(string accountId, [FromBody] UpdateFullStudentRequest request)
+        {
+            // 🔹 Tìm tài khoản dựa trên AccountId
+            var account = await _accounts.Find(acc => acc.AccountId.ToString() == accountId).FirstOrDefaultAsync();
+            if (account == null)
+            {
+                return NotFound(new { message = "Không tìm thấy tài khoản học sinh" });
+            }
+
+            // 🔹 Tìm thông tin sinh viên dựa trên AccountId
+            var student = await _infoStudents.Find(stu => stu.AccountId.ToString() == accountId).FirstOrDefaultAsync();
+            if (student == null)
+            {
+                return NotFound(new { message = "Không tìm thấy thông tin sinh viên" });
+            }
+
+            // 🔹 Cập nhật thông tin tài khoản (UserName, UserCode, Số điện thoại, Trạng thái)
+            var updateAccount = Builders<AccountModels>.Update
+                .Set(acc => acc.UserName, request.UserName)
+                .Set(acc => acc.UserCode, request.UserCode)
+                .Set(acc => acc.NumberPhone, request.NumberPhone);
+            await _accounts.UpdateOneAsync(acc => acc.AccountId == account.AccountId, updateAccount);
+
+            // 🔹 Cập nhật thông tin sinh viên (Email, Giới tính, Ảnh, Phụ huynh,...)
+            var updateStudent = Builders<InfoStudentModels>.Update
+                .Set(stu => stu.Email, request.Email)
+                .Set(stu => stu.Gender, request.Gender)
+                .Set(stu => stu.Picture, request.Picture)
+                .Set(stu => stu.NameParent, request.NameParent)
+                .Set(stu => stu.Address, request.Address)
+                .Set(stu => stu.ParentNumberPhone, request.ParentNumberPhone);
+
+            await _infoStudents.UpdateOneAsync(stu => stu.AccountId == student.AccountId, updateStudent);
+
+            return Ok(new { message = "Cập nhật tài khoản và thông tin sinh viên thành công!" });
+        }
+
+
+        [HttpPut("account-student/status/{accountId}")]
+        public async Task<IActionResult> UpdateAccountStatus(string accountId, [FromBody] UpdateStatusRequest request)
+        {
+            var account = await _accounts.Find(acc => acc.AccountId.ToString() == accountId).FirstOrDefaultAsync();
+            var infoStudent = await _infoStudents.Find(info => info.AccountId.ToString() == account.AccountId.ToString()).FirstOrDefaultAsync();
+
+            if (account == null)
+            {
+                return NotFound(new { message = "Không tìm thấy tài khoản học sinh" });
+            }
+
+            // Cập nhật trạng thái tài khoản
+            var update = Builders<AccountModels>.Update.Set(acc => acc.Status, request.Status);
+            await _accounts.UpdateOneAsync(acc => acc.AccountId.ToString() == account.AccountId.ToString(), update);
+
+            // ✅ Chỉ gửi email khi trạng thái là "active"
+            if (request.Status == OperatingStatusEnum.active && infoStudent.Email != null)
+            {
+                try
+                {
+                    await _emailService.SendEmailAsync(
+                        infoStudent.Email,
+                        account.UserName ?? "Bạn",
+                        "Tài khoản của bạn đã được kích hoạt",
+                        $"<p>Xin chào <strong>{account.UserName}</strong>,</p><p>Tài khoản của bạn hiện đã được <strong>kích hoạt</strong>. Bạn có thể đăng nhập và sử dụng hệ thống.</p><p>Trân trọng.</p>"
+                    );
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("❌ Lỗi khi gửi email: " + ex.Message);
+                }
+            }
+
+            return Ok(new { message = $"Cập nhật trạng thái tài khoản thành công! Trạng thái mới: {request.Status}" });
+        }
+
+
+
+
+        [HttpGet("All-account-staff")]
+        public async Task<IActionResult> GetAllStaffs()
+        {
+            // Lọc danh sách tài khoản có role là 2 (RoleTypeStatusEnum.Student)
+            var accounts = await _accounts
+                .Find(acc => acc.Roles == RoleTypeStatusEnum.Staff)
                 .ToListAsync();
 
-            if (!activeAccounts.Any())
+            if (!accounts.Any())
             {
-                return NotFound(new { message = "Không có tài khoản nào đang hoạt động với vai trò nhân viên!" });
+                return NotFound(new { message = "Không có tài khoản nào có vai trò là Student." });
             }
 
-            return Ok(activeAccounts);
+            // Lấy thông tin chi tiết của học sinh từ danh sách tài khoản
+            var result = accounts.Select(account => new
+            {
+                Account = new
+                {
+                    AccountId = account.AccountId.ToString(),
+                    account.UserName,
+                    account.UserCode,
+                    account.NumberPhone,
+                    account.Roles,
+                    account.Status
+                }
+            }).ToList();
+
+            return Ok(result);
         }
-*/
-/*
-        [HttpPost("register/staff")]
-        public async Task<IActionResult> RegisterStaff([FromBody] AccountDTO registerStaff)
+
+        [HttpPost("add-account")]
+        public async Task<IActionResult> AddAccount([FromBody] AccountDTOs newAccount)
         {
-            if (registerStaff== null)
+            if (newAccount == null)
             {
-                return BadRequest("Invalid input");
+                return BadRequest(new { message = "Dữ liệu không hợp lệ!" });
             }
 
-            if (string.IsNullOrEmpty(registerStaff.Password) || string.IsNullOrEmpty(registerStaff.NumberPhone))
-            {
-                return BadRequest(new { message = "Password and NumberPhone are required" });
-            }
-
-            // Kiểm tra nếu số điện thoại đã tồn tại
-            var existingUser = await _context.Accounts.FirstOrDefaultAsync(x => x.NumberPhone == registerStaff.NumberPhone);
-            if (existingUser != null)
+            // Kiểm tra nếu số điện thoại đã tồn tại trong MongoDB
+            var existingAccount = await _accounts.Find(x => x.NumberPhone == newAccount.NumberPhone).FirstOrDefaultAsync();
+            if (existingAccount != null)
             {
                 return BadRequest(new { message = "Số điện thoại đã được đăng ký!" });
             }
-            // Tạo đối tượng AccountModels và gán thông tin người dùng
-            var account = new AccountDTO
+
+           
+
+            // 🔹 **Tạo đối tượng AccountModels**
+            var account = new AccountModels
             {
-                UserName = registerStaff.UserName,
-                UserCode = registerStaff.UserCode,
-                NumberPhone = registerStaff.NumberPhone,
-                Password = HashPassword(registerStaff.Password),
-                Roles = registerStaff.Roles,
-                Status = registerStaff.Status,
+                UserName = newAccount.UserName,
+                UserCode = newAccount.UserCode,
+                NumberPhone = newAccount.NumberPhone,
+                Password = HashPassword(newAccount.Password),
+                Roles = RoleTypeStatusEnum.Staff,
+                Status = OperatingStatusEnum.active
             };
 
-            // Thêm người dùng vào bảng AccountModels
-            await _context.Accounts.AddAsync(account);
-            await _context.SaveChangesAsync();
+            // 🔹 **Lưu tài khoản vào MongoDB**
+            await _accounts.InsertOneAsync(account);
 
-            return Ok(new { message = "Registration successful" });
+            return Ok(new { message = "Thêm tài khoản thành công!"});
         }
 
 
-        // Đăng nhập và tạo JWT token
-        [HttpPost("login")]
-        public IActionResult Login([FromBody] LoginRequestDTO loginDTO)
+        [HttpDelete("delete-account/{accountId}")]
+        public async Task<IActionResult> DeleteAccount(string accountId)
         {
-            if (loginDTO == null || string.IsNullOrEmpty(loginDTO.UserCode) || string.IsNullOrEmpty(loginDTO.Password))
-                return BadRequest(new { message = "Tên đăng nhập và mật khẩu không được để trống!" });
-
-            var user = _context.Accounts.FirstOrDefault(x => x.UserCode == loginDTO.UserCode);
-            if (user == null || !VerifyPassword(loginDTO.Password, user.Password) )
-                return Unauthorized(new { message = "Tên đăng nhập hoặc mật khẩu không đúng!" });
-
-            // Kiểm tra trạng thái tài khoản
-            if (user.Status != OperatingStatusEnum.active) // Giả sử Active là giá trị hợp lệ
+            if (!ObjectId.TryParse(accountId, out ObjectId objectId))
             {
-                return Unauthorized(new { message = "Tài khoản chưa được kích hoạt. Vui lòng liên hệ quản trị viên!" });
+                return BadRequest(new { message = "AccountId không hợp lệ!" });
             }
 
-            // Tạo token JWT
-            var token = GenerateJwtToken(user);
+            var result = await _accounts.DeleteOneAsync(acc => acc.AccountId == objectId);
 
-            return Ok(new
+            if (result.DeletedCount == 0)
             {
-                role = user.Roles,
-                idAccount = user.IdAccount,
-                token
-            });
+                return NotFound(new { message = "Không tìm thấy tài khoản để xóa!" });
+            }
+
+            return Ok(new { message = "Xóa tài khoản thành công!" });
         }
 
+    }
 
-
-
-
-        // Mã hóa mật khẩu
-        private string HashPassword(string password)
-        {
-            using var sha256 = SHA256.Create();
-            var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-            return Convert.ToBase64String(bytes);
-        }
-
-        // Kiểm tra mật khẩu
-        private bool VerifyPassword(string enteredPassword, string storedPassword)
-        {
-            var hashedEnteredPassword = HashPassword(enteredPassword);
-            return hashedEnteredPassword == storedPassword;
-        }
-
-        
-
-        [HttpPut("update-status-active/{id}")]
-        public async Task<IActionResult> UpdateAccountStatusActive(int id)
-        {
-            // Tìm tài khoản theo ID
-            var account = await _context.Accounts.FindAsync(id);
-
-            if (account == null)
-            {
-                return NotFound(new { message = "Tài khoản không tồn tại!" });
-            }
-
-            // Kiểm tra nếu tài khoản đã active
-            if (account.Status == OperatingStatusEnum.active)
-            {
-                return BadRequest(new { message = "Tài khoản đã được kích hoạt trước đó!" });
-            }
-
-            // Cập nhật trạng thái thành active
-            account.Status = OperatingStatusEnum.active;
-            _context.Accounts.Update(account);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "Cập nhật trạng thái tài khoản thành công!", account });
-        }
-
-        [HttpPut("update-status-blocked/{id}")]
-        public async Task<IActionResult> UpdateAccountStatusBlocked(int id)
-        {
-            // Tìm tài khoản theo ID
-            var account = await _context.Accounts.FindAsync(id);
-
-            if (account == null)
-            {
-                return NotFound(new { message = "Tài khoản không tồn tại!" });
-            }
-
-            // Kiểm tra nếu tài khoản đã active
-            if (account.Status == OperatingStatusEnum.blocked)
-            {
-                return BadRequest(new { message = "Tài khoản đã bị chặn trước đó!" });
-            }
-
-            // Cập nhật trạng thái thành active
-            account.Status = OperatingStatusEnum.blocked;
-            _context.Accounts.Update(account);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "Cập nhật trạng thái tài khoản thành công!", account });
-        }
-
-        [HttpPut("update-status-inactive/{id}")]
-        public async Task<IActionResult> UpdateAccountStatusInactive(int id)
-        {
-            // Tìm tài khoản theo ID
-            var account = await _context.Accounts.FindAsync(id);
-
-            if (account == null)
-            {
-                return NotFound(new { message = "Tài khoản không tồn tại!" });
-            }
-
-            // Kiểm tra nếu tài khoản đã active
-            if (account.Status == OperatingStatusEnum.inactive)
-            {
-                return BadRequest(new { message = "Tài khoản đã ngưng hoạt động trước đó!" });
-            }
-
-            // Cập nhật trạng thái thành active
-            account.Status = OperatingStatusEnum.inactive;
-            _context.Accounts.Update(account);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "Cập nhật trạng thái tài khoản thành công!", account });
-        }*/
-/*    }
 }
-*/
+
+
+

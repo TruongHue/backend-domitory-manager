@@ -1,52 +1,48 @@
-﻿using API_dormitory.Models.Rooms;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel.DataAnnotations;
-using API_dormitory.Models.registerRoom;
-using API_dormitory.Models.common;
+﻿using API_dormitory.Models.common;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+using System;
 
 namespace API_dormitory.Models.Bills
 {
     public class WaterBillModels
     {
-        [Key]
-        [Column("idWater")]
-        public int IdWater { get; set; }
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public ObjectId Id { get; set; }
 
-        [Required]
-        [ForeignKey("InfoRoom")]
-        [Column("idRoom")]
-        public int IdRoom { get; set; }
+        [BsonRepresentation(BsonType.ObjectId)]
+        public ObjectId IdRoom { get; set; }
+        [BsonElement("studentCode")]
+        [BsonIgnoreIfNull] // Bỏ qua nếu giá trị là null
+        public string StudentCode { get; set; } // Cho phép null
 
-        [Required]
-        [Column("beforeIndex")]
+
+        [BsonElement("studentName")]
+        [BsonIgnoreIfNull] // Bỏ qua nếu giá trị là null
+        public string StudentName { get; set; } // Cho phép null
+        [BsonElement("beforeIndex")]
         public int BeforeIndex { get; set; }
 
-        [Required]
-        [Column("afterIndex")]
+        [BsonElement("afterIndex")]
         public int AfterIndex { get; set; }
-        [Required]
-        [Column("price")]
+
+        [BsonElement("price")]
         public decimal Price { get; set; }
-        [Required]
-        [Column("indexLimit")]
+
+        [BsonElement("indexLimit")]
         public decimal IndexLimit { get; set; }
-        [Required]
-        [Column("priceLimit")]
+
+        [BsonElement("priceLimit")]
         public decimal PriceLimit { get; set; }
-        [Required]
-        [Column("dateOfRecord")]
-        public DateTime DateOfRecord { get; set; }
-        [Required]
-        [Column("total")]
+
+        [BsonElement("dateOfRecord")]
+        public DateTime DateOfRecord { get; set; } = DateTime.UtcNow;
+
+        [BsonElement("total")]
         public decimal Total { get; set; }
-        [Required]
-        [Column("status")]
+
+        [BsonElement("status")]
         public PaymentStatusEnum Status { get; set; }
-
-        // Quan hệ: Một hóa đơn thuộc về một phòng
-        public virtual InfoRoomModels InfoRoom { get; set; }
     }
-
-
 }
-

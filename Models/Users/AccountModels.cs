@@ -26,8 +26,7 @@ namespace API_dormitory.Models.Users
         public string Password { get; set; } = string.Empty;
 
         [BsonElement("roles")]
-        [BsonRepresentation(BsonType.String)] // Lưu enum dưới dạng string
-        [JsonConverter(typeof(JsonStringEnumConverter))]
+        [BsonRequired]
         public RoleTypeStatusEnum Roles { get; set; }
 
         [BsonElement("status")]
