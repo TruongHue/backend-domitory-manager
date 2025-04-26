@@ -21,6 +21,7 @@ using CloudinaryDotNet;
 using API_dormitory.Models.DTO.User;
 using OfficeOpenXml.Drawing;
 using OfficeOpenXml;
+using Microsoft.AspNetCore.Authorization;
 
 
 namespace API_dormitory.Controllers
@@ -43,7 +44,7 @@ namespace API_dormitory.Controllers
             _emailService = emailService;
 
         }
-
+        [Authorize(Roles = "Admin,Staff")] // Chỉ cho phép người có vai trò Admin và Staff
         [HttpGet("active-account-students")]
         public async Task<IActionResult> GetActiveAccounts()
         {
@@ -638,7 +639,7 @@ namespace API_dormitory.Controllers
 
             return Ok(new
             {
-                role = user.Roles,
+                role = Enum.GetName(typeof(RoleTypeStatusEnum), user.Roles),  // Chuyển role từ số sang tên
                 idAccount = user.AccountId.ToString(),
                 token
             });
@@ -670,9 +671,11 @@ namespace API_dormitory.Controllers
                 {
             new Claim(ClaimTypes.NameIdentifier, user.AccountId.ToString()),
             new Claim(ClaimTypes.Name, user.UserName),
-            new Claim(ClaimTypes.Role, user.Roles.ToString())
+            new Claim(ClaimTypes.Role, Enum.GetName(typeof(RoleTypeStatusEnum), user.Roles))
                 }),
                 Expires = DateTime.UtcNow.AddHours(6), // Token có thời hạn 6 giờ
+                Issuer = _configuration["Jwt:Issuer"],     // ✅ thêm dòng này
+                Audience = _configuration["Jwt:Audience"],
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
 
