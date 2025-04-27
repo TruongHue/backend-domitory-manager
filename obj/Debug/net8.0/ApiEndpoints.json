@@ -1,22 +1,6 @@
 [
   {
     "ContainingType": "API_dormitory.Controllers.AccountController",
-    "Method": "CreateStaffAccount",
-    "RelativePath": "api/Account/account-staff",
-    "HttpMethod": "POST",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "request",
-        "Type": "API_dormitory.Models.DTO.Account.AccountDTOs",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "API_dormitory.Controllers.AccountController",
     "Method": "DeleteAccountStaff",
     "RelativePath": "api/Account/account-staff/{accountId}",
     "HttpMethod": "DELETE",
@@ -25,38 +9,6 @@
     "Parameters": [
       {
         "Name": "accountId",
-        "Type": "System.String",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "API_dormitory.Controllers.AccountController",
-    "Method": "GetAccountStaffById",
-    "RelativePath": "api/Account/account-staff/{idAccount}",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "idAccount",
-        "Type": "System.String",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "API_dormitory.Controllers.AccountController",
-    "Method": "GetAccountStudentByStudentCode",
-    "RelativePath": "api/Account/account-student-code/{StudentCode}",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "studentCode",
         "Type": "System.String",
         "IsRequired": true
       }
@@ -81,43 +33,6 @@
   },
   {
     "ContainingType": "API_dormitory.Controllers.AccountController",
-    "Method": "DeleteAccountStudent",
-    "RelativePath": "api/Account/account-student/{accountId}",
-    "HttpMethod": "DELETE",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "accountId",
-        "Type": "System.String",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "API_dormitory.Controllers.AccountController",
-    "Method": "UpdateFullStudentInfo",
-    "RelativePath": "api/Account/account-student/full/{accountId}",
-    "HttpMethod": "PUT",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "accountId",
-        "Type": "System.String",
-        "IsRequired": true
-      },
-      {
-        "Name": "request",
-        "Type": "API_dormitory.Models.DTO.User.UpdateFullStudentRequest",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "API_dormitory.Controllers.AccountController",
     "Method": "UpdateAccountStatus",
     "RelativePath": "api/Account/account-student/status/{accountId}",
     "HttpMethod": "PUT",
@@ -132,27 +47,6 @@
       {
         "Name": "request",
         "Type": "API_dormitory.Models.DTO.User.UpdateStatusRequest",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "API_dormitory.Controllers.AccountController",
-    "Method": "UpdatePasswordByAdmin",
-    "RelativePath": "api/Account/account/password/{accountId}",
-    "HttpMethod": "PUT",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "accountId",
-        "Type": "System.String",
-        "IsRequired": true
-      },
-      {
-        "Name": "request",
-        "Type": "API_dormitory.Models.DTO.User.updatePassword",
         "IsRequired": true
       }
     ],
@@ -197,17 +91,7 @@
   {
     "ContainingType": "API_dormitory.Controllers.AccountController",
     "Method": "GetAllAccountStaffs",
-    "RelativePath": "api/Account/all-account-staffs",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "API_dormitory.Controllers.AccountController",
-    "Method": "GetAllAccounts",
-    "RelativePath": "api/Account/All-account-students",
+    "RelativePath": "api/Account/All-account-staffs",
     "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,
@@ -596,32 +480,6 @@
   },
   {
     "ContainingType": "API_dormitory.Controllers.BillController",
-    "Method": "GetLatestPrice",
-    "RelativePath": "api/Bill/price/latest",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "API_dormitory.Controllers.BillController",
-    "Method": "UpdateLatestPrice",
-    "RelativePath": "api/Bill/price/update-latest",
-    "HttpMethod": "PUT",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "updatedPrice",
-        "Type": "API_dormitory.Models.Bills.PriceWaterAndElectricity",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "API_dormitory.Controllers.BillController",
     "Method": "GetAllBillRooms",
     "RelativePath": "api/Bill/Room",
     "HttpMethod": "GET",
@@ -804,22 +662,6 @@
     "Parameters": [
       {
         "Name": "id",
-        "Type": "System.String",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "API_dormitory.Controllers.BuildingController",
-    "Method": "GetBuildingByName",
-    "RelativePath": "api/Building/by-name/{name}",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "name",
         "Type": "System.String",
         "IsRequired": true
       }
@@ -1168,27 +1010,6 @@
   },
   {
     "ContainingType": "API_dormitory.Controllers.RegisterRoomController",
-    "Method": "UpdateRegisterRoom",
-    "RelativePath": "api/RegisterRoom/update-register/{idRegister}",
-    "HttpMethod": "PUT",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "idRegister",
-        "Type": "System.String",
-        "IsRequired": true
-      },
-      {
-        "Name": "updateDto",
-        "Type": "API_dormitory.Models.DTO.RegisterRoom.UpdateRegisterRoomDTO",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "API_dormitory.Controllers.RegisterRoomController",
     "Method": "UpdateOperatingStatus",
     "RelativePath": "api/RegisterRoom/update-status/{idRegister}",
     "HttpMethod": "PUT",
@@ -1359,22 +1180,6 @@
     "Parameters": [
       {
         "Name": "id",
-        "Type": "System.String",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "API_dormitory.Controllers.RoomController",
-    "Method": "GetRoomsByBuilding",
-    "RelativePath": "api/Room/by-building/{idBuilding}",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "idBuilding",
         "Type": "System.String",
         "IsRequired": true
       }

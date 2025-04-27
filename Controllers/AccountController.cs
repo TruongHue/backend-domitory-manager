@@ -44,7 +44,9 @@ namespace API_dormitory.Controllers
             _emailService = emailService;
 
         }
-        [Authorize(Roles = "Admin,Staff")] // Chỉ cho phép người có vai trò Admin và Staff
+
+        //Có dùng
+        [Authorize(Roles = "Admin")] // Chỉ cho phép người có vai trò Admin và Staff
         [HttpGet("active-account-students")]
         public async Task<IActionResult> GetActiveAccounts()
         {
@@ -93,6 +95,8 @@ namespace API_dormitory.Controllers
             return Ok(result);
         }
 
+        //Có dùng
+        [Authorize(Roles = "Admin")]
         [HttpGet("inactive-account-students")]
         public async Task<IActionResult> GetInActiveAccounts()
         {
@@ -141,6 +145,8 @@ namespace API_dormitory.Controllers
             return Ok(result);
         }
 
+        //Có dùng
+        [Authorize(Roles = "Admin")]
         [HttpGet("blocked-account-students")]
         public async Task<IActionResult> GetBlockedAccounts()
         {
@@ -189,7 +195,8 @@ namespace API_dormitory.Controllers
             return Ok(result);
         }
 
-
+        //Có dùng
+        [Authorize(Roles = "Admin")]
         [HttpGet("wait-account-students")]
         public async Task<IActionResult> GetWaitAccounts()
         {
@@ -239,54 +246,7 @@ namespace API_dormitory.Controllers
         }
 
 
-
-        [HttpGet("All-account-students")]
-        public async Task<IActionResult> GetAllAccounts()
-        {
-            var students = await _infoStudents.Find(_ => true).ToListAsync();
-            var accounts = await _accounts.Find(_ => true).ToListAsync();
-
-            var result = students.Select(student =>
-            {
-                var account = accounts.FirstOrDefault(acc => acc.AccountId == student.AccountId
-                                                              && acc.Roles == RoleTypeStatusEnum.Student);
-                return new
-                {
-                    // Hiển thị thông tin tài khoản trước
-                    Account = account != null ? new
-                    {
-                        AccountId = account.AccountId.ToString(),
-                        account.UserName,
-                        account.UserCode,
-                        account.NumberPhone,
-                        account.Roles,
-                        account.Status
-                    } : null,
-
-                    // Sau đó hiển thị thông tin học sinh
-                    InfoStudent = new
-                    {
-                        Id = student.Id.ToString(),
-                        student.Email,
-                        student.Gender,
-                        student.Picture,
-                        student.NameParent,
-                        student.Address,
-                        student.ParentNumberPhone
-                    }
-                };
-            }).ToList();
-
-            if (!result.Any())
-            {
-                return NotFound(new { message = "Không có tài khoản nào" });
-            }
-
-            return Ok(result);
-        }
-
-
-
+        //Có dùng
         [HttpGet("account-student-id/{accountId}")]
         public async Task<IActionResult> GetAccountStudentByAccountId(string accountId)
         {
@@ -330,50 +290,10 @@ namespace API_dormitory.Controllers
             return Ok(result);
         }
 
-        [HttpGet("account-student-code/{StudentCode}")]
-        public async Task<IActionResult> GetAccountStudentByStudentCode(string studentCode)
-        {
-            var account = await _accounts.Find(acc => acc.UserCode == studentCode
-                                                      && acc.Roles == RoleTypeStatusEnum.Student)
-                                         .FirstOrDefaultAsync();
+        
 
-            if (account == null)
-            {
-                return NotFound(new { message = "Không tìm thấy tài khoản học sinh" });
-            }
-
-            var student = await _infoStudents.Find(stu => stu.AccountId.ToString() == account.AccountId.ToString()).FirstOrDefaultAsync();
-
-            var result = new
-            {
-                // Hiển thị thông tin tài khoản trước
-                Account = new
-                {
-                    AccountId = account.AccountId.ToString(),
-                    account.UserName,
-                    account.UserCode,
-                    account.NumberPhone,
-                    account.Roles,
-                    account.Status
-                },
-
-                // Sau đó hiển thị thông tin học sinh
-                InfoStudent = new
-                {
-                    Id = student?.Id.ToString(),
-                    student?.Email,
-                    student?.Gender,
-                    student?.Picture,
-                    student?.NameParent,
-                    student?.Address,
-                    student?.ParentNumberPhone
-                }
-            };
-
-            return Ok(result);
-        }
-
-        [HttpGet("all-account-staffs")]
+        [Authorize(Roles = "Admin")]
+        [HttpGet("All-account-staffs")]
         public async Task<IActionResult> GetAllAccountStaffs()
         {
             var accounts = await _accounts.Find(acc => acc.Roles == RoleTypeStatusEnum.Staff).ToListAsync();
@@ -396,62 +316,9 @@ namespace API_dormitory.Controllers
             return Ok(result);
         }
 
+      
 
-        [HttpPost("account-staff")]
-        public async Task<IActionResult> CreateStaffAccount([FromBody] AccountDTOs request)
-        {
-            // 🔹 Kiểm tra xem tài khoản đã tồn tại chưa (dựa trên Email hoặc Số điện thoại)
-            var existingAccount = await _accounts.Find(acc => acc.NumberPhone == request.NumberPhone).FirstOrDefaultAsync();
-            if (existingAccount != null)
-            {
-                return BadRequest(new { message = "Tài khoản đã tồn tại!" });
-            }
-
-            // 🔹 Mã hóa mật khẩu trước khi lưu (sử dụng BCrypt hoặc thư viện bảo mật)
-            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password);
-
-            // 🔹 Tạo tài khoản mới
-            var newAccount = new AccountModels
-            {
-                AccountId = ObjectId.GenerateNewId(),
-                UserName = request.UserName,
-                UserCode = request.UserCode,
-                NumberPhone = request.NumberPhone,
-                Password = hashedPassword,
-                Roles = RoleTypeStatusEnum.Staff,  // Gán role Staff
-                Status = OperatingStatusEnum.active // Mặc định trạng thái hoạt động
-            };
-
-            // 🔹 Thêm tài khoản vào MongoDB
-            await _accounts.InsertOneAsync(newAccount);
-            return Ok(new { message = "Tạo tài khoản staff thành công!" });
-        }
-
-
-        [HttpGet("account-staff/{idAccount}")]
-        public async Task<IActionResult> GetAccountStaffById(string idAccount)
-        {
-            var account = await _accounts.Find(acc => acc.AccountId.ToString() == idAccount && acc.Roles == RoleTypeStatusEnum.Staff).FirstOrDefaultAsync();
-
-            if (account == null)
-            {
-                return NotFound(new { message = "Không tìm thấy tài khoản nhân viên" });
-            }
-
-            var result = new
-            {
-                AccountId = account.AccountId.ToString(),
-                account.UserName,
-                account.UserCode,
-                account.NumberPhone,
-                account.Roles,
-                account.Status
-            };
-
-            return Ok(result);
-        }
-
-
+        [Authorize(Roles = "Admin,Student")]
         // 🔹 API đăng ký tài khoản sinh viên
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromForm] StudentRequestDTO registerRequest, IFormFile? file)
@@ -534,6 +401,7 @@ namespace API_dormitory.Controllers
             return Ok(new { message = "Registration successful", imageUrl = $"/images/{fileName}" });
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPost("import-excel")]
         public async Task<IActionResult> ImportFromExcel(IFormFile file)
         {
@@ -683,57 +551,9 @@ namespace API_dormitory.Controllers
             return tokenHandler.WriteToken(token);
         }
 
-        [HttpDelete("account-student/{accountId}")]
-        public async Task<IActionResult> DeleteAccountStudent(string accountId)
-        {
-            var account = await _accounts.Find(acc => acc.AccountId.ToString() == accountId
-                                                      && acc.Roles == RoleTypeStatusEnum.Student)
-                                         .FirstOrDefaultAsync();
+      
 
-            if (account == null)
-            {
-                return NotFound(new { message = "Không tìm thấy tài khoản học sinh" });
-            }
-
-            // Tìm sinh viên liên kết với tài khoản
-            var student = await _infoStudents.Find(stu => stu.AccountId.ToString() == accountId).FirstOrDefaultAsync();
-
-            // Xóa tài khoản trước
-            await _accounts.DeleteOneAsync(acc => acc.AccountId == account.AccountId);
-
-            // Nếu có thông tin sinh viên, xóa luôn
-            if (student != null)
-            {
-                await _infoStudents.DeleteOneAsync(stu => stu.AccountId == account.AccountId);
-            }
-
-            return Ok(new { message = "Xóa tài khoản sinh viên thành công!" });
-        }
-
-        [HttpPut("account/password/{accountId}")]
-        public async Task<IActionResult> UpdatePasswordByAdmin(string accountId, [FromBody] updatePassword request)
-        {
-            // 🔹 Tìm tài khoản theo AccountId
-            var account = await _accounts.Find(acc => acc.AccountId.ToString() == accountId)
-                                         .FirstOrDefaultAsync();
-
-            if (account == null)
-            {
-                return NotFound(new { message = "Không tìm thấy tài khoản!" });
-            }
-
-            // 🔹 Mã hóa mật khẩu mới
-            string hashedPassword = HashPassword(request.Password);
-
-            // 🔹 Cập nhật mật khẩu mới vào MongoDB
-            var update = Builders<AccountModels>.Update.Set(acc => acc.Password, hashedPassword);
-            await _accounts.UpdateOneAsync(acc => acc.AccountId == account.AccountId, update);
-
-            return Ok(new { message = "Cập nhật mật khẩu thành công!" });
-        }
-
-
-
+        [Authorize(Roles = "Admin")]
         [HttpDelete("account-staff/{accountId}")]
         public async Task<IActionResult> DeleteAccountStaff(string accountId)
         {
@@ -750,45 +570,8 @@ namespace API_dormitory.Controllers
             return Ok(new { message = "Xóa tài khoản sinh viên thành công!" });
         }
 
-        [HttpPut("account-student/full/{accountId}")]
-        public async Task<IActionResult> UpdateFullStudentInfo(string accountId, [FromBody] UpdateFullStudentRequest request)
-        {
-            // 🔹 Tìm tài khoản dựa trên AccountId
-            var account = await _accounts.Find(acc => acc.AccountId.ToString() == accountId).FirstOrDefaultAsync();
-            if (account == null)
-            {
-                return NotFound(new { message = "Không tìm thấy tài khoản học sinh" });
-            }
-
-            // 🔹 Tìm thông tin sinh viên dựa trên AccountId
-            var student = await _infoStudents.Find(stu => stu.AccountId.ToString() == accountId).FirstOrDefaultAsync();
-            if (student == null)
-            {
-                return NotFound(new { message = "Không tìm thấy thông tin sinh viên" });
-            }
-
-            // 🔹 Cập nhật thông tin tài khoản (UserName, UserCode, Số điện thoại, Trạng thái)
-            var updateAccount = Builders<AccountModels>.Update
-                .Set(acc => acc.UserName, request.UserName)
-                .Set(acc => acc.UserCode, request.UserCode)
-                .Set(acc => acc.NumberPhone, request.NumberPhone);
-            await _accounts.UpdateOneAsync(acc => acc.AccountId == account.AccountId, updateAccount);
-
-            // 🔹 Cập nhật thông tin sinh viên (Email, Giới tính, Ảnh, Phụ huynh,...)
-            var updateStudent = Builders<InfoStudentModels>.Update
-                .Set(stu => stu.Email, request.Email)
-                .Set(stu => stu.Gender, request.Gender)
-                .Set(stu => stu.Picture, request.Picture)
-                .Set(stu => stu.NameParent, request.NameParent)
-                .Set(stu => stu.Address, request.Address)
-                .Set(stu => stu.ParentNumberPhone, request.ParentNumberPhone);
-
-            await _infoStudents.UpdateOneAsync(stu => stu.AccountId == student.AccountId, updateStudent);
-
-            return Ok(new { message = "Cập nhật tài khoản và thông tin sinh viên thành công!" });
-        }
-
-
+     
+        [Authorize(Roles = "Admin")]
         [HttpPut("account-student/status/{accountId}")]
         public async Task<IActionResult> UpdateAccountStatus(string accountId, [FromBody] UpdateStatusRequest request)
         {
@@ -827,7 +610,7 @@ namespace API_dormitory.Controllers
 
 
 
-
+        [Authorize(Roles = "Admin")]
         [HttpGet("All-account-staff")]
         public async Task<IActionResult> GetAllStaffs()
         {
@@ -858,6 +641,7 @@ namespace API_dormitory.Controllers
             return Ok(result);
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPost("add-account")]
         public async Task<IActionResult> AddAccount([FromBody] AccountDTOs newAccount)
         {
@@ -892,7 +676,7 @@ namespace API_dormitory.Controllers
             return Ok(new { message = "Thêm tài khoản thành công!"});
         }
 
-
+        [Authorize(Roles = "Admin")]
         [HttpDelete("delete-account/{accountId}")]
         public async Task<IActionResult> DeleteAccount(string accountId)
         {

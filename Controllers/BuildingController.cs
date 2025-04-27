@@ -58,19 +58,6 @@ namespace API_dormitory.Controllers
             });
         }
 
-        // 🔹 Lấy tòa nhà theo tên
-        [HttpGet("by-name/{name}")]
-        public async Task<IActionResult> GetBuildingByName(string name)
-        {
-            var filter = Builders<BuildingModels>.Filter.Regex("nameBuilding", new BsonRegularExpression(name, "i"));
-            var buildings = await _buildingCollection.Find(filter).ToListAsync();
-
-            if (buildings.Count == 0)
-                return NotFound(new { message = "Không tìm thấy tòa nhà" });
-
-            return Ok(buildings);
-        }
-
         // 🔹 Thêm tòa nhà mới
         [HttpPost]
         public async Task<IActionResult> CreateBuilding([FromBody] BuildingDTOs newBuilding)

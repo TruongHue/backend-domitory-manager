@@ -375,33 +375,6 @@ namespace API_dormitory.Controllers
         }
 
 
-        [HttpPut("update-register/{idRegister}")]
-        public async Task<IActionResult> UpdateRegisterRoom(string idRegister, [FromBody] UpdateRegisterRoomDTO updateDto)
-        {
-            if (!ObjectId.TryParse(idRegister, out var objectId))
-                return BadRequest(new { message = "IdRegister không hợp lệ." });
-
-            var filter = Builders<RegisterRoomModels>.Filter.Eq(r => r.IdRegister, objectId);
-
-            var update = Builders<RegisterRoomModels>.Update
-                .Set(r => r.IdStudent, ObjectId.Parse(updateDto.IdStudent))
-                .Set(r => r.IdRoom, ObjectId.Parse(updateDto.IdRoom))
-                .Set(r => r.IdRegistrationPeriod, ObjectId.Parse(updateDto.IdRegistrationPeriod))
-                .Set(r => r.StartDate, updateDto.StartDate)
-                .Set(r => r.EndDate, updateDto.EndDate)
-                .Set(r => r.ActionDate, updateDto.ActionDate)
-                .Set(r => r.Total, updateDto.Total)
-                .Set(r => r.PaymentStatus, updateDto.PaymentStatus)
-                .Set(r => r.Status, updateDto.Status);
-
-            var result = await _registerRoomCollection.UpdateOneAsync(filter, update);
-
-            if (result.MatchedCount == 0)
-                return NotFound(new { message = "Không tìm thấy đăng ký phòng." });
-
-            return Ok(new { message = "Cập nhật thông tin đăng ký phòng thành công!" });
-        }
-
         [HttpDelete("delete-register/{idRegister}")]
         public async Task<IActionResult> DeleteRegisterRoom(string idRegister)
         {

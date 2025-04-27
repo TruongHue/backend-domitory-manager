@@ -10,6 +10,7 @@ using API_dormitory.Models.DTO.Room;
 using API_dormitory.Models.registerRoom;
 using API_dormitory.Models.Rooms;
 using API_dormitory.Models.Users;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -45,7 +46,7 @@ namespace API_dormitory.Controllers
         }
 
 
-
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet("Room")]
         public async Task<IActionResult> GetAllBillRooms()
         {
@@ -70,7 +71,7 @@ namespace API_dormitory.Controllers
             return Ok(bills);
         }
 
-
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet("Room/{idRoom}")]
         public async Task<IActionResult> GetBillByRoomId(string idRoom)
         {
@@ -96,7 +97,7 @@ namespace API_dormitory.Controllers
         }
 
 
-
+        [Authorize(Roles = "Admin")]
         [HttpPost("Room")]
         public async Task<IActionResult> CreateRoomBill([FromBody] AddBillRoomDTOs roomBillDto)
         {
@@ -138,7 +139,7 @@ namespace API_dormitory.Controllers
         }
 
 
-
+        [Authorize(Roles = "Admin")]
         [HttpPost("price/add-or-update-price")]
         public async Task<IActionResult> AddOrUpdatePrice([FromBody] PriceWaterAndElectricity request)
         {
@@ -173,6 +174,7 @@ namespace API_dormitory.Controllers
             }
         }
 
+        [Authorize(Roles = "Admin,Student")]
         [HttpGet("price")]
         public async Task<IActionResult> GetAllPrices()
         {
@@ -191,73 +193,10 @@ namespace API_dormitory.Controllers
             return Ok(prices);
         }
 
+     
 
-        [HttpGet("price/latest")]
-        public async Task<IActionResult> GetLatestPrice()
-        {
-            var latestPrice = await _priceCollection
-                .Find(_ => true)
-                .SortByDescending(p => p.ActionDate) // Sắp xếp theo thời gian mới nhất
-                .Limit(1)
-                .FirstOrDefaultAsync();
-
-            if (latestPrice == null)
-            {
-                return NotFound("Không có dữ liệu giá điện nước.");
-            }
-
-            // Trả về ID dưới dạng string
-            var response = new
-            {
-                Id = latestPrice.Id.ToString(),
-                ElectricityPrice = latestPrice.ElectricityPrice,
-                WaterPrice = latestPrice.WaterPrice,
-                WaterLimit = latestPrice.WaterLimit,
-                WaterPriceOverLimit = latestPrice.WaterPriceOverLimit,
-                ActionDate = latestPrice.ActionDate
-            };
-
-            return Ok(response);
-        }
-
-
-        [HttpPut("price/update-latest")]
-        public async Task<IActionResult> UpdateLatestPrice([FromBody] PriceWaterAndElectricity updatedPrice)
-        {
-            if (updatedPrice == null)
-            {
-                return BadRequest("Dữ liệu cập nhật không hợp lệ.");
-            }
-
-            var latestPrice = await _priceCollection
-                .Find(_ => true)
-                .SortByDescending(p => p.ActionDate)
-                .Limit(1)
-                .FirstOrDefaultAsync();
-
-            if (latestPrice == null)
-            {
-                return NotFound("Không có dữ liệu giá điện nước để cập nhật.");
-            }
-
-            var filter = Builders<PriceWaterAndElectricity>.Filter.Eq(p => p.Id, latestPrice.Id);
-            var update = Builders<PriceWaterAndElectricity>.Update
-                .Set(p => p.ElectricityPrice, updatedPrice.ElectricityPrice)
-                .Set(p => p.WaterPrice, updatedPrice.WaterPrice)
-                .Set(p => p.WaterLimit, updatedPrice.WaterLimit)
-                .Set(p => p.WaterPriceOverLimit, updatedPrice.WaterPriceOverLimit)
-                .Set(p => p.ActionDate, DateTime.UtcNow);
-
-            var result = await _priceCollection.UpdateOneAsync(filter, update);
-
-            if (result.ModifiedCount == 0)
-            {
-                return StatusCode(500, "Cập nhật giá điện nước không thành công.");
-            }
-
-            return Ok(new { Message = "Cập nhật giá điện nước thành công!", UpdatedPrice = updatedPrice });
-        }
-
+       
+        [Authorize(Roles = "Admin")]
         [HttpDelete("price/{id}")]
         public async Task<IActionResult> DeletePriceById(string id)
         {
@@ -276,7 +215,7 @@ namespace API_dormitory.Controllers
             return Ok(new { Message = "Xóa giá điện nước thành công!", DeletedId = id });
         }
 
-
+        [Authorize(Roles = "Admin,Student")]
         [HttpGet("room/{roomId}")]
         public async Task<IActionResult> GetRoomBillByRoomId(string roomId)
         {
@@ -307,6 +246,8 @@ namespace API_dormitory.Controllers
 
             return Ok(response);
         }
+
+
         [HttpGet("all/electricity/{roomId}")]
         public async Task<List<ElectricityBillDto>> GetAllElectricityBillsByRoom(string roomId)
         {

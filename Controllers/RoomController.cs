@@ -151,27 +151,6 @@ namespace API_dormitory.Controllers
             });
         }
 
-        // 🔹 Lấy danh sách phòng theo ID tòa nhà
-        [HttpGet("by-building/{idBuilding}")]
-        public async Task<IActionResult> GetRoomsByBuilding(string idBuilding)
-        {
-            if (!ObjectId.TryParse(idBuilding, out var objectId))
-                return BadRequest(new { message = "ID tòa nhà không hợp lệ" });
-
-            var rooms = await _roomsCollection.Find(r => r.IdBuilding == objectId).ToListAsync();
-            if (rooms == null || rooms.Count == 0)
-                return NotFound(new { message = "Không có phòng nào trong tòa nhà này" });
-
-            return Ok(rooms.Select(room => new
-            {
-                Id = room.IdRoom.ToString(),
-                room.RoomName,
-                room.Gender,
-                room.NumberOfBed,
-                room.Status
-            }));
-        }
-
         // 🔹 Thêm phòng mới
         [HttpPost]
         public async Task<IActionResult> CreateRoom([FromBody] AddRoomDTO newRoom)
