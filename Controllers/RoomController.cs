@@ -10,6 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Linq;
 using API_dormitory.Models.Bills;
 using API_dormitory.Models.registerRoom;
+using Microsoft.AspNetCore.Authorization;
 
 namespace API_dormitory.Controllers
 {
@@ -31,8 +32,9 @@ namespace API_dormitory.Controllers
             _registerRoomCollection = database.GetCollection<RegisterRoomModels>("RegisterRoom");
 
         }
-        [HttpGet]
 
+        [Authorize(Roles = "Admin,Student,Staff")]
+        [HttpGet]
         public async Task<IActionResult> GetAllRooms()
         {
             var rooms = await _roomsCollection.Find(_ => true).ToListAsync();
@@ -107,7 +109,7 @@ namespace API_dormitory.Controllers
             }));
         }
 
-
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet("by-id/{id}")]
         public async Task<IActionResult> GetRoomById(string id)
         {
@@ -152,6 +154,7 @@ namespace API_dormitory.Controllers
         }
 
         // 🔹 Thêm phòng mới
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<IActionResult> CreateRoom([FromBody] AddRoomDTO newRoom)
         {
@@ -193,6 +196,7 @@ namespace API_dormitory.Controllers
         }
 
         // 🔹 Cập nhật thông tin phòng
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateRoom(string id, [FromBody] InfoRoomDTOs updateRoom)
         {
@@ -222,6 +226,7 @@ namespace API_dormitory.Controllers
         }
 
         // 🔹 Cập nhật trạng thái phòng
+        [Authorize(Roles = "Admin")]
         [HttpPut("status")]
         public async Task<IActionResult> UpdateRoomStatus([FromBody] UpdateStatusRoomDTO status)
         {
@@ -245,6 +250,7 @@ namespace API_dormitory.Controllers
         }
 
         // 🔹 Xóa phòng
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteRoom(string id)
         {

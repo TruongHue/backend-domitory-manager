@@ -5,6 +5,7 @@ using API_dormitory.Models.DTO.RegisterRoom;
 using API_dormitory.Models.registerRoom;
 using API_dormitory.Models.Rooms;
 using API_dormitory.Models.Users;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -42,6 +43,7 @@ namespace API_dormitory.Controllers
 
         }
 
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet]
         public async Task<IActionResult> GetAllRegisterRooms()
         {
@@ -119,7 +121,7 @@ namespace API_dormitory.Controllers
             return Ok(result);
         }
 
-
+        [Authorize(Roles = "Admin,Student")]
         [HttpPost]
         public async Task<IActionResult> CreateRegister([FromBody] AddRegisterRoomDTOs registerDto)
         {
@@ -230,7 +232,7 @@ namespace API_dormitory.Controllers
             return Ok(new { message = "Đăng ký phòng thành công!" });
         }
 
-
+        [Authorize(Roles = "Admin")]
         [HttpPut("update-payment-status/{idRegister}")]
         public async Task<IActionResult> UpdatePaymentStatus(string idRegister, [FromBody] UpdateStatusPaymentDTO newPaymentStatus)
         {
@@ -307,7 +309,7 @@ namespace API_dormitory.Controllers
             return Ok(new { message = "Cập nhật trạng thái thanh toán thành công!" });
         }
 
-
+        [Authorize(Roles = "Admin")]
         [HttpPut("update-status/{idRegister}")]
         public async Task<IActionResult> UpdateOperatingStatus(string idRegister, [FromBody] UpdateStatusDTO newStatus)
         {
@@ -374,7 +376,7 @@ namespace API_dormitory.Controllers
             return Ok(new { message = "Cập nhật trạng thái hoạt động thành công!" });
         }
 
-
+        [Authorize(Roles = "Admin")]
         [HttpDelete("delete-register/{idRegister}")]
         public async Task<IActionResult> DeleteRegisterRoom(string idRegister)
         {
@@ -389,6 +391,8 @@ namespace API_dormitory.Controllers
 
             return Ok(new { message = "Xóa đăng ký phòng thành công!" });
         }
+
+        [Authorize(Roles = "Admin,Student")]
         [HttpGet("total-registered-students")]
         public async Task<IActionResult> GetTotalRegisteredStudents()
         {
@@ -416,7 +420,7 @@ namespace API_dormitory.Controllers
             });
         }
 
-
+        [Authorize(Roles = "Admin,Student")]
         [HttpGet("history/{idStudent}")]
         public async Task<IActionResult> GetRegisterRoomHistory(string idStudent)
         {
@@ -500,6 +504,7 @@ namespace API_dormitory.Controllers
             return Ok(result);
         }
 
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet("students-in-room/{idRoom}")]
         public async Task<IActionResult> GetStudentsInRoom(string idRoom)
         {
@@ -557,6 +562,8 @@ namespace API_dormitory.Controllers
             return Ok(result);
         }
 
+
+        [Authorize(Roles = "Admin")]
         [HttpGet("students-paybill/{idRoom}")]
         public async Task<IActionResult> GetStudentsPayBill(string idRoom)
         {

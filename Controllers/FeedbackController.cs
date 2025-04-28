@@ -1,6 +1,7 @@
 ﻿using API_dormitory.Data;
 using API_dormitory.Models.Feedback;
 using API_dormitory.Models.Users;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 
@@ -22,6 +23,7 @@ namespace API_dormitory.Controllers
         }
 
         // Lấy danh sách tất cả phản hồi (admin hoặc dashboard)
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet]
         public async Task<ActionResult<List<object>>> GetAll()
         {
@@ -80,6 +82,7 @@ namespace API_dormitory.Controllers
 
 
         // Gửi phản hồi
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] FeedbackModels feedback)
         {
@@ -105,6 +108,7 @@ namespace API_dormitory.Controllers
         }
 
         // Admin phản hồi lại
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpPut("{id}/response")]
         public async Task<IActionResult> UpdateResponse(string id, [FromBody] string response)
         {
@@ -124,6 +128,7 @@ namespace API_dormitory.Controllers
         }
 
         // Lấy phản hồi theo AccountId
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet("account/{accountId}")]
         public async Task<ActionResult<List<object>>> GetByAccountId(string accountId)
         {

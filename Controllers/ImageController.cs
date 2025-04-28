@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.IO;
@@ -15,6 +16,7 @@ public class ImageController : ControllerBase
     }
 
     [HttpPost("upload")]
+    [Authorize(Roles = "Admin,Student,Staff")]
     public IActionResult UploadImage([FromForm] IFormFile file)
     {
         try

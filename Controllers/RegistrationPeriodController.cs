@@ -3,6 +3,7 @@ using API_dormitory.Models.common;
 using API_dormitory.Models.DTO.RegisterRoom;
 using API_dormitory.Models.Registrations;
 using API_dormitory.Models.Rooms;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -24,6 +25,7 @@ namespace API_dormitory.Controllers
         }
 
         // Lấy tất cả kỳ đăng ký
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet("get-all-registration-periods")]
         public async Task<IActionResult> GetAllRegistrationPeriods()
         {
@@ -32,6 +34,7 @@ namespace API_dormitory.Controllers
         }
 
         // Lấy kỳ đăng ký đang hoạt động
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet("get-all-registration-periods-active")]
         public async Task<IActionResult> GetAllRegistrationPeriodsActive()
         {
@@ -48,6 +51,7 @@ namespace API_dormitory.Controllers
         }
 
 
+        [Authorize(Roles = "Admin")]
         [HttpPost("add-registration-period")]
         public async Task<IActionResult> AddRegistrationPeriod([FromBody] AddRegistrationPeriodDTOs model)
         {
@@ -82,6 +86,7 @@ namespace API_dormitory.Controllers
         }
 
         // Xóa kỳ đăng ký
+        [Authorize(Roles = "Admin")]
         [HttpDelete("delete-registration-period/{id}")]
         public async Task<IActionResult> DeleteRegistrationPeriod(string id)
         {
@@ -95,6 +100,7 @@ namespace API_dormitory.Controllers
         }
 
         // Cập nhật kỳ đăng ký
+        [Authorize(Roles = "Admin")]
         [HttpPut("update-registration-period/{id}")]
         public async Task<IActionResult> UpdateRegistrationPeriod(string id, [FromBody] RegistrationPeriodModels model)
         {
@@ -131,7 +137,7 @@ namespace API_dormitory.Controllers
             return Ok(new { message = "Cập nhật kỳ đăng ký thành công!", data = existingPeriod });
         }
 
-
+        [Authorize(Roles = "Admin")]
         [HttpPut("update-registration-period-status/{id}")]
         public async Task<IActionResult> UpdateRegistrationPeriodStatus(string id, [FromBody] RegistrationStatusDTO Registration)
         {

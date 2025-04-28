@@ -2,6 +2,7 @@
 using API_dormitory.Models.common;
 using API_dormitory.Models.Post;
 using API_dormitory.Models.Users;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -32,6 +33,7 @@ namespace API_dormitory.Controllers
         }
 
         // Lấy tất cả bài đăng
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet]
         public async Task<IActionResult> GetAllPosts()
         {
@@ -44,6 +46,7 @@ namespace API_dormitory.Controllers
         }
 
 
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetPostById(string id)
         {
@@ -61,7 +64,7 @@ namespace API_dormitory.Controllers
             return Ok(post);
         }
 
-
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<IActionResult> CreatePost([FromBody] PostModel newPost)
         {
@@ -104,7 +107,7 @@ namespace API_dormitory.Controllers
         }
 
 
-
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdatePost(string id, [FromBody] PostModel updatedPost)
         {
@@ -133,6 +136,7 @@ namespace API_dormitory.Controllers
 
 
         // Xóa bài đăng
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeletePost(string id)
         {

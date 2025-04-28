@@ -2,6 +2,7 @@
 using API_dormitory.Models.common;
 using API_dormitory.Models.DTO.Building;
 using API_dormitory.Models.Rooms;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -22,6 +23,7 @@ namespace API_dormitory.Controllers
         }
 
         // 🔹 Lấy danh sách tòa nhà
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet]
         public async Task<IActionResult> GetAllBuildings()
         {
@@ -37,6 +39,7 @@ namespace API_dormitory.Controllers
         }
 
         // 🔹 Lấy tòa nhà theo ID
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet("by-id/{id}")] 
         public async Task<IActionResult> GetBuildingById(string id)
         {
@@ -60,6 +63,7 @@ namespace API_dormitory.Controllers
 
         // 🔹 Thêm tòa nhà mới
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> CreateBuilding([FromBody] BuildingDTOs newBuilding)
         {
             if (string.IsNullOrEmpty(newBuilding.NameBuilding))
@@ -79,6 +83,7 @@ namespace API_dormitory.Controllers
 
 
         // 🔹 Cập nhật trạng thái tòa nhà
+        [Authorize(Roles = "Admin")]
         [HttpPut("status")]
         public async Task<IActionResult> UpdateBuildingStatus([FromBody] UpdateStatusBuildingDTO status)
         {
@@ -95,6 +100,7 @@ namespace API_dormitory.Controllers
         }
 
         // 🔹 Cập nhật thông tin tòa nhà
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateBuilding(string id, [FromBody] BuildingDTOs updateBuilding)
         {
@@ -115,6 +121,7 @@ namespace API_dormitory.Controllers
         }
 
         // 🔹 Xóa tòa nhà
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteBuilding(string id)
         {

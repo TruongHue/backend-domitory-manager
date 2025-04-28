@@ -247,6 +247,7 @@ namespace API_dormitory.Controllers
             return Ok(response);
         }
 
+        [Authorize(Roles = "Admin,Student,Staff")]
 
         [HttpGet("all/electricity/{roomId}")]
         public async Task<List<ElectricityBillDto>> GetAllElectricityBillsByRoom(string roomId)
@@ -277,7 +278,7 @@ namespace API_dormitory.Controllers
 
             return result;
         }
-
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet("all/water/{roomId}")]
         public async Task<List<WaterBillDto>> GetAllWaterBillsByRoom(string roomId)
         {
@@ -307,7 +308,7 @@ namespace API_dormitory.Controllers
 
             return result;
         }
-
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet("all/bills/{roomId}")]
         public async Task<IActionResult> GetAllBillsByRoom(string roomId)
         {
@@ -363,7 +364,7 @@ namespace API_dormitory.Controllers
 
             return Ok(allBills);
         }
-
+        [Authorize(Roles = "Admin")]
         [HttpDelete("electric/{id}")]
         public async Task<IActionResult> DeleteElectricBill(string id)
         {
@@ -376,7 +377,7 @@ namespace API_dormitory.Controllers
 
             return Ok(new { message = "Đã xóa hóa đơn điện thành công" });
         }
-
+        [Authorize(Roles = "Admin")]
         [HttpDelete("water/{id}")]
         public async Task<IActionResult> DeleteWaterBill(string id)
         {
@@ -390,7 +391,7 @@ namespace API_dormitory.Controllers
             return Ok(new { message = "Đã xóa hóa đơn nước thành công" });
         }
 
-
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet("latestElectricity/{roomId}")]
         public async Task<IActionResult> GetLatestElectricityBillByRoom(string roomId)
         {
@@ -426,6 +427,7 @@ namespace API_dormitory.Controllers
             return Ok(result);
         }
 
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet("latestWater/{roomId}")]
         public async Task<IActionResult> GetLatestWaterBillByRoom(string roomId)
         {
@@ -460,7 +462,7 @@ namespace API_dormitory.Controllers
 
             return Ok(result);
         }
-
+        [Authorize(Roles = "Admin,Staff")]
         [HttpPost("add/electricity")]
         public async Task<IActionResult> AddElectricityBill([FromBody] AddBillElectricityDTO billDto)
         {
@@ -521,7 +523,7 @@ namespace API_dormitory.Controllers
 
             return Ok(new { Message = "Thêm hóa đơn điện thành công!"});
         }
-
+        [Authorize(Roles = "Admin,Staff")]
         [HttpPost("add/water")]
         public async Task<IActionResult> AddWaterBill([FromBody] AddBillWaterDTO billDto)
         {
@@ -594,7 +596,7 @@ namespace API_dormitory.Controllers
 
             return Ok(new { Message = "Thêm hóa đơn điện thành công!" });
         }
-
+        [Authorize(Roles = "Admin")]
         [HttpPut("electricity/pay/{billId}")]
         public async Task<IActionResult> UpdateElectricityBillPayment(string billId, [FromBody] UpdateElectricityBillDTO updateDto)
         {
@@ -669,6 +671,7 @@ namespace API_dormitory.Controllers
             return Ok(new { Message = "Cập nhật thông tin thanh toán thành công!" });
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPut("water/pay/{billId}")]
         public async Task<IActionResult> UpdateWaterBillPayment(string billId, [FromBody] UpdateElectricityBillDTO updateDto)
         {
@@ -741,6 +744,7 @@ namespace API_dormitory.Controllers
             return Ok(new { Message = "Cập nhật thông tin thanh toán thành công!" });
         }
 
+        [Authorize(Roles = "Admin,Student,Staff")]
         [HttpGet("room/{roomId}/has-unpaid-bill")]
         public async Task<IActionResult> CheckHasUnpaidBill(string roomId)
         {
