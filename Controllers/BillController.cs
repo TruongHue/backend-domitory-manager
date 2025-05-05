@@ -302,6 +302,8 @@ namespace API_dormitory.Controllers
                 AfterIndex = b.AfterIndex,
                 Price = b.Price,
                 Total = b.Total,
+                IndexLimit = b.IndexLimit,
+                PriceLimit = b.PriceLimit,
                 DateOfRecord = b.DateOfRecord,
                 Status = b.Status
             }).ToList();
@@ -351,6 +353,8 @@ namespace API_dormitory.Controllers
                 AfterIndex = b.AfterIndex,
                 Price = b.Price,
                 Total = b.Total,
+                IndexLimit = b.IndexLimit,
+                PriceLimit = b.PriceLimit,
                 DateOfRecord = b.DateOfRecord,
                 Status = b.Status
             }).ToList();
@@ -456,6 +460,8 @@ namespace API_dormitory.Controllers
                 AfterIndex = latestBill.AfterIndex,
                 Price = latestBill.Price,
                 Total = latestBill.Total,
+                IndexLimit = latestBill.IndexLimit,
+                PriceLimit = latestBill.PriceLimit,
                 DateOfRecord = latestBill.DateOfRecord,
                 Status = latestBill.Status
             };
@@ -594,7 +600,7 @@ namespace API_dormitory.Controllers
 
             await _waterBillCollection.InsertOneAsync(newWaterBill);
 
-            return Ok(new { Message = "Thêm hóa đơn điện thành công!" });
+            return Ok(new { Message = "Thêm hóa đơn điện thành công!",newWaterBill });
         }
         [Authorize(Roles = "Admin")]
         [HttpPut("electricity/pay/{billId}")]
