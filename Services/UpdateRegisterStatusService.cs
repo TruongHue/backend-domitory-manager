@@ -33,17 +33,39 @@ namespace API_dormitory.Services
             {
                 var registerRoomCollection = scope.ServiceProvider.GetRequiredService<IMongoCollection<RegisterRoomModels>>();
 
-                var today = DateTime.UtcNow;
-                var filter = Builders<RegisterRoomModels>.Filter.And(
-                    Builders<RegisterRoomModels>.Filter.Eq(r => r.Status, OperatingStatusEnum.active),
-                    Builders<RegisterRoomModels>.Filter.Lt(r => r.EndDate, today)
-                );
-
-                var update = Builders<RegisterRoomModels>.Update.Set(r => r.Status, OperatingStatusEnum.inactive);
-
-                await registerRoomCollection.UpdateManyAsync(filter, update);
-                Console.WriteLine("Đã cập nhật trạng thái đăng ký phòng hết hạn.");
+                await DeactivateExpiredRegistrations(registerRoomCollection);
+                await DeactivateUnpaidLateRegistrations(registerRoomCollection);
             }
         }
+
+        private async Task DeactivateExpiredRegistrations(IMongoCollection<RegisterRoomModels> collection)
+        {
+            var today = DateTime.UtcNow;
+            var filter = Builders<RegisterRoomModels>.Filter.And(
+                Builders<RegisterRoomModels>.Filter.Eq(r => r.Status, OperatingStatusEnum.active),
+                Builders<RegisterRoomModels>.Filter.Lt(r => r.EndDate, today)
+            );
+
+            var update = Builders<RegisterRoomModels>.Update.Set(r => r.Status, OperatingStatusEnum.inactive);
+            var result = await collection.UpdateManyAsync(filter, update);
+
+            Console.WriteLine($"✅ Cập nhật {result.ModifiedCount} đơn đăng ký hết hạn thành inactive.");
+        }
+
+        private async Task DeactivateUnpaidLateRegistrations(IMongoCollection<RegisterRoomModels> collection)
+        {
+            var today = DateTime.UtcNow;
+            var filter = Builders<RegisterRoomModels>.Filter.And(
+                Builders<RegisterRoomModels>.Filter.Eq(r => r.Status, OperatingStatusEnum.wait),
+                Builders<RegisterRoomModels>.Filter.Eq(r => r.PaymentStatus, PaymentStatusEnum.unpaid),
+                Builders<RegisterRoomModels>.Filter.Lt(r => r.StartDate, today)
+            );
+
+            var update = Builders<RegisterRoomModels>.Update.Set(r => r.Status, OperatingStatusEnum.inactive);
+            var result = await collection.UpdateManyAsync(filter, update);
+
+            Console.WriteLine($"⚠️ Cập nhật {result.ModifiedCount} đơn đăng ký chưa thanh toán quá hạn thành inactive.");
+        }
+
     }
 }

@@ -1,4 +1,5 @@
 ﻿using API_dormitory.Data;
+using API_dormitory.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -95,6 +96,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddSingleton<EmailService>();
+builder.Services.AddHostedService<UpdateRegisterStatusService>();
 
 // ✅ **Tạo `app` sau khi đã cấu hình tất cả các dịch vụ**
 var app = builder.Build();
