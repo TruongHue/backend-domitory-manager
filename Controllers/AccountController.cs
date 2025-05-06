@@ -375,7 +375,7 @@ namespace API_dormitory.Controllers
                 Status = registerAccountDTO.Status ?? OperatingStatusEnum.inactive,
                 InfoStudentId = infoStudentId
             };
-
+            //
             await _accounts.InsertOneAsync(account);
             ObjectId accountId = ObjectId.Parse(account.AccountId.ToString());
 
