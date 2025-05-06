@@ -320,6 +320,73 @@ namespace API_dormitory.Controllers
 
 
 
+        // 🔹 API đăng ký tài khoản sinh viên
+        [HttpPost("register")]
+        public async Task<IActionResult> Register([FromForm] StudentRequestDTO registerRequest, IFormFile? file)
+        {
+            if (registerRequest == null || registerRequest.Account == null || registerRequest.InfoStudent == null)
+            {
+                return BadRequest("Invalid input");
+            }
+
+            var registerAccountDTO = registerRequest.Account;
+            var registerInfoUserDTO = registerRequest.InfoStudent;
+
+            if (string.IsNullOrEmpty(registerAccountDTO.Password) || string.IsNullOrEmpty(registerAccountDTO.NumberPhone))
+            {
+                return BadRequest(new { message = "Password and NumberPhone are required" });
+            }
+
+            // 🔹 Kiểm tra nếu số điện thoại đã tồn tại trong MongoDB
+            var existingUser = await _accounts.Find(x => x.NumberPhone == registerAccountDTO.NumberPhone).FirstOrDefaultAsync();
+            if (existingUser != null)
+            {
+                return BadRequest(new { message = "Số điện thoại đã được đăng ký!" });
+            }
+
+            // 🔹 Upload ảnh lên Cloudinary (nếu có)
+            string uploadedImageUrl = null;
+            if (file != null && file.Length > 0)
+            {
+                uploadedImageUrl = await _cloudinaryService.UploadImageAsync(file); // Gọi service đã cấu hình
+            }
+
+            // 🔹 Tạo đối tượng InfoStudent
+            var infoUser = new InfoStudentModels
+            {
+                Email = registerInfoUserDTO.Email,
+                Picture = uploadedImageUrl, // ✅ Dùng link ảnh từ Cloudinary
+                NameParent = registerInfoUserDTO.NameParent,
+                ParentNumberPhone = registerInfoUserDTO.ParentNumberPhone,
+                Address = registerInfoUserDTO.Address,
+                Gender = registerInfoUserDTO.Gender,
+            };
+
+            await _infoStudents.InsertOneAsync(infoUser);
+            ObjectId infoStudentId = ObjectId.Parse(infoUser.Id.ToString());
+
+            var account = new AccountModels
+            {
+                UserName = registerAccountDTO.UserName,
+                UserCode = registerAccountDTO.UserCode,
+                NumberPhone = registerAccountDTO.NumberPhone,
+                Password = HashPassword(registerAccountDTO.Password),
+                Roles = (RoleTypeStatusEnum)registerAccountDTO.Roles,
+                Status = registerAccountDTO.Status ?? OperatingStatusEnum.inactive,
+                InfoStudentId = infoStudentId
+            };
+            //
+            await _accounts.InsertOneAsync(account);
+            ObjectId accountId = ObjectId.Parse(account.AccountId.ToString());
+
+            var update = Builders<InfoStudentModels>.Update.Set(x => x.AccountId, accountId);
+            var filter = Builders<InfoStudentModels>.Filter.Eq(x => x.Id, infoStudentId);
+            await _infoStudents.UpdateOneAsync(filter, update);
+
+            return Ok(new { message = "Registration successful", imageUrl = uploadedImageUrl });
+        }
+
+
         [Authorize(Roles = "Admin")]
         [HttpPost("import-excel-with-images")]
         public async Task<IActionResult> ImportFromExcelWithImages(IFormFile excelFile, IFormFileCollection imageFiles)
@@ -434,129 +501,6 @@ namespace API_dormitory.Controllers
 
             return Ok(new { message = "Import thành công!", count = students.Count });
         }
-
-
-
-        [Authorize(Roles = "Admin")]
-        [HttpPost("import-excel-with-images")]
-        public async Task<IActionResult> ImportFromExcelWithImages(IFormFile excelFile, IFormFileCollection imageFiles)
-        {
-            if (excelFile == null || excelFile.Length == 0)
-                return BadRequest("No Excel file uploaded");
-
-            if (imageFiles == null || imageFiles.Count == 0)
-                return BadRequest("No image files uploaded");
-
-            using var stream = new MemoryStream();
-            await excelFile.CopyToAsync(stream);
-            using var package = new ExcelPackage(stream);
-            var worksheet = package.Workbook.Worksheets[0];
-
-            var students = new List<StudentRequestDTO>();
-            var duplicateStudents = new List<(int Row, StudentRequestDTO Student)>(); // Lưu cả row và object sinh viên
-
-            for (int row = 2; row <= worksheet.Dimension.End.Row; row++)
-            {
-                var student = new StudentRequestDTO
-                {
-                    Account = new AccountDTOs
-                    {
-                        UserName = worksheet.Cells[row, 2].Text,
-                        UserCode = worksheet.Cells[row, 3].Text,
-                        NumberPhone = worksheet.Cells[row, 4].Text,
-                        Password = worksheet.Cells[row, 3].Text,
-                        Roles = (int)RoleTypeStatusEnum.Student,
-                        Status = (int)OperatingStatusEnum.active
-                    },
-                    InfoStudent = new InfoStudentDTOs
-                    {
-                        Email = worksheet.Cells[row, 5].Text,
-                        Gender = worksheet.Cells[row, 6].Text.Trim().ToLower() == "nam"
-                            ? GenderEnum.male
-                            : GenderEnum.female,
-                        NameParent = worksheet.Cells[row, 7].Text,
-                        ParentNumberPhone = worksheet.Cells[row, 8].Text,
-                        Address = worksheet.Cells[row, 9].Text,
-                        Picture = worksheet.Cells[row, 10].Text
-                    }
-                };
-
-                var existingUser = await _accounts.Find(x =>
-                    x.NumberPhone == student.Account.NumberPhone || x.UserName == student.Account.UserName
-                ).FirstOrDefaultAsync();
-
-                if (existingUser != null)
-                {
-                    duplicateStudents.Add((row, student));
-                    continue;
-                }
-
-                var imageFile = imageFiles.FirstOrDefault(f => f.FileName == student.InfoStudent.Picture);
-                if (imageFile != null)
-                {
-                    var uploadedImageUrl = await _cloudinaryService.UploadImageAsync(imageFile);
-                    student.InfoStudent.Picture = uploadedImageUrl;
-                }
-                else
-                {
-                    student.InfoStudent.Picture = "default_image_url";
-                }
-
-                students.Add(student);
-            }
-
-            foreach (var stu in students)
-            {
-                await Register(stu, null);
-            }
-
-            if (duplicateStudents.Any())
-            {
-                // Tạo file Excel chứa danh sách bị trùng
-                using var resultPackage = new ExcelPackage();
-                var resultSheet = resultPackage.Workbook.Worksheets.Add("DuplicateStudents");
-
-                // Header
-                resultSheet.Cells[1, 1].Value = "UserName";
-                resultSheet.Cells[1, 2].Value = "UserCode";
-                resultSheet.Cells[1, 3].Value = "NumberPhone";
-                resultSheet.Cells[1, 4].Value = "Password";
-                resultSheet.Cells[1, 5].Value = "Email";
-                resultSheet.Cells[1, 6].Value = "Gender";
-                resultSheet.Cells[1, 7].Value = "NameParent";
-                resultSheet.Cells[1, 8].Value = "ParentNumberPhone";
-                resultSheet.Cells[1, 9].Value = "Address";
-                resultSheet.Cells[1, 10].Value = "Picture";
-
-                // Dữ liệu
-                int r = 2;
-                foreach (var dup in duplicateStudents)
-                {
-                    var s = dup.Student;
-                    resultSheet.Cells[r, 1].Value = s.Account.UserName;
-                    resultSheet.Cells[r, 2].Value = s.Account.UserCode;
-                    resultSheet.Cells[r, 3].Value = s.Account.NumberPhone;
-                    resultSheet.Cells[r, 4].Value = s.Account.Password;
-                    resultSheet.Cells[r, 5].Value = s.InfoStudent.Email;
-                    resultSheet.Cells[r, 6].Value = s.InfoStudent.Gender.ToString();
-                    resultSheet.Cells[r, 7].Value = s.InfoStudent.NameParent;
-                    resultSheet.Cells[r, 8].Value = s.InfoStudent.ParentNumberPhone;
-                    resultSheet.Cells[r, 9].Value = s.InfoStudent.Address;
-                    resultSheet.Cells[r, 10].Value = s.InfoStudent.Picture;
-                    r++;
-                }
-
-                var resultStream = new MemoryStream();
-                resultPackage.SaveAs(resultStream);
-                resultStream.Position = 0;
-
-                return File(resultStream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "DuplicateStudents.xlsx");
-            }
-
-            return Ok(new { message = "Import thành công!", count = students.Count });
-        }
-
-
 
 
         //Đăng nhập
