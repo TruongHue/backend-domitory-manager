@@ -1,11 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "gqpBI/H+B0kEFyLKVCluu345JV0e1k+spGqJ5psAiNJURaibKEFac+SQ3C30ysNq3wt0MBJ0Yk5SJa4oZclV7g==",
+  "dgSpecHash": "BNwEKmc1CZ37cJQLmc0NrRJ7BJoRfAjVzMYX+QRlc6jwul5noab/vhccIhS+u2WaIgMIaYmwXWTKLciixKRJLg==",
   "success": true,
   "projectFilePath": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\API_dormitory.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\admin\\.nuget\\packages\\bcrypt.net-next\\4.0.3\\bcrypt.net-next.4.0.3.nupkg.sha512",
-    "C:\\Users\\admin\\.nuget\\packages\\cloudinarydotnet\\1.27.4\\cloudinarydotnet.1.27.4.nupkg.sha512",
+    "C:\\Users\\admin\\.nuget\\packages\\cloudinarydotnet\\1.27.5\\cloudinarydotnet.1.27.5.nupkg.sha512",
     "C:\\Users\\admin\\.nuget\\packages\\dnsclient\\1.6.1\\dnsclient.1.6.1.nupkg.sha512",
     "C:\\Users\\admin\\.nuget\\packages\\dotnetenv\\3.1.1\\dotnetenv.3.1.1.nupkg.sha512",
     "C:\\Users\\admin\\.nuget\\packages\\epplus\\6.2.5\\epplus.6.2.5.nupkg.sha512",

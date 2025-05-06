@@ -1,17 +1,23 @@
 ﻿using API_dormitory.Data;
+using API_dormitory.Models.registerRoom;
 using API_dormitory.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Bson;
+using MongoDB.Driver;
 using OfficeOpenXml;
 using System.Text;
 
 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 DotNetEnv.Env.Load();
-var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSingleton<MongoDbContext>();
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.Configure<CloudinarySettings>(
+    builder.Configuration.GetSection("CloudinarySettings"));
+
+builder.Services.AddScoped<CloudinaryService>();   // Đăng ký CloudinaryService
+builder.Services.AddSingleton<MongoDbContext>();   // Đăng ký MongoDbContext
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -20,6 +26,17 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.MaxDepth = 64;
         options.JsonSerializerOptions.PropertyNamingPolicy = null; // Giữ nguyên tên thuộc tính
     });
+
+builder.Services.AddScoped<RegisterRoomService>();  // Đăng ký RegisterRoomService
+
+// Đăng ký IMongoCollection<RegisterRoomModels> dưới dạng Singleton
+builder.Services.AddSingleton<IMongoCollection<RegisterRoomModels>>(sp =>
+{
+    var context = sp.GetRequiredService<MongoDbContext>(); // Đảm bảo MongoDbContext đã được đăng ký
+    return context.GetCollection<RegisterRoomModels>("RegisterRooms"); // Đảm bảo "RegisterRooms" là tên đúng của collection trong MongoDB
+});
+
+
 
 // Kết nối cơ sở dữ liệu MySQL.
 builder.Services.AddDbContext<AppDbContext>(options =>

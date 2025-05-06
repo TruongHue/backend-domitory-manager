@@ -126,15 +126,20 @@
   },
   {
     "ContainingType": "API_dormitory.Controllers.AccountController",
-    "Method": "ImportFromExcel",
-    "RelativePath": "api/Account/import-excel",
+    "Method": "ImportFromExcelWithImages",
+    "RelativePath": "api/Account/import-excel-with-images",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
     "Parameters": [
       {
-        "Name": "file",
+        "Name": "excelFile",
         "Type": "Microsoft.AspNetCore.Http.IFormFile",
+        "IsRequired": false
+      },
+      {
+        "Name": "imageFiles",
+        "Type": "Microsoft.AspNetCore.Http.IFormFileCollection",
         "IsRequired": false
       }
     ],

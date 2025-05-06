@@ -22,6 +22,7 @@ using API_dormitory.Models.DTO.User;
 using OfficeOpenXml.Drawing;
 using OfficeOpenXml;
 using Microsoft.AspNetCore.Authorization;
+using API_dormitory.Services;
 
 
 namespace API_dormitory.Controllers
@@ -34,15 +35,16 @@ namespace API_dormitory.Controllers
         private readonly IMongoCollection<AccountModels> _accounts;
         private readonly IMongoCollection<InfoStudentModels> _infoStudents;
         private readonly EmailService _emailService;
+        private readonly CloudinaryService _cloudinaryService;
 
 
-        public AccountController(IConfiguration configuration, MongoDbContext context, EmailService emailService)
+        public AccountController(IConfiguration configuration, MongoDbContext context, EmailService emailService, CloudinaryService cloudinaryService)
         {
             _configuration = configuration;
             _accounts = context.GetCollection<AccountModels>("Accounts");
             _infoStudents = context.GetCollection<InfoStudentModels>("InfoStudents");
             _emailService = emailService;
-
+            _cloudinaryService = cloudinaryService; // ✅ Gán CloudinaryService
         }
 
         //Có dùng
@@ -316,7 +318,7 @@ namespace API_dormitory.Controllers
             return Ok(result);
         }
 
-      
+
 
         // 🔹 API đăng ký tài khoản sinh viên
         [HttpPost("register")]
@@ -342,41 +344,27 @@ namespace API_dormitory.Controllers
                 return BadRequest(new { message = "Số điện thoại đã được đăng ký!" });
             }
 
-            // 🔹 **Lưu file ảnh vào wwwroot/images/**
-            string fileName = null;
+            // 🔹 Upload ảnh lên Cloudinary (nếu có)
+            string uploadedImageUrl = null;
             if (file != null && file.Length > 0)
             {
-                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/images");
-                if (!Directory.Exists(uploadsFolder))
-                {
-                    Directory.CreateDirectory(uploadsFolder);
-                }
-
-                fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName); // Đặt tên file ngẫu nhiên
-                var filePath = Path.Combine(uploadsFolder, fileName);
-
-                using (var fileStream = new FileStream(filePath, FileMode.Create))
-                {
-                    await file.CopyToAsync(fileStream);
-                }
+                uploadedImageUrl = await _cloudinaryService.UploadImageAsync(file); // Gọi service đã cấu hình
             }
 
-            // 🔹 **Tạo đối tượng InfoStudent**
+            // 🔹 Tạo đối tượng InfoStudent
             var infoUser = new InfoStudentModels
             {
                 Email = registerInfoUserDTO.Email,
-                Picture = fileName,
+                Picture = uploadedImageUrl, // ✅ Dùng link ảnh từ Cloudinary
                 NameParent = registerInfoUserDTO.NameParent,
                 ParentNumberPhone = registerInfoUserDTO.ParentNumberPhone,
                 Address = registerInfoUserDTO.Address,
                 Gender = registerInfoUserDTO.Gender,
             };
 
-            // 🔹 **Lưu thông tin sinh viên vào MongoDB**
             await _infoStudents.InsertOneAsync(infoUser);
             ObjectId infoStudentId = ObjectId.Parse(infoUser.Id.ToString());
 
-            // 🔹 **Tạo đối tượng AccountModels**
             var account = new AccountModels
             {
                 UserName = registerAccountDTO.UserName,
@@ -385,37 +373,38 @@ namespace API_dormitory.Controllers
                 Password = HashPassword(registerAccountDTO.Password),
                 Roles = (RoleTypeStatusEnum)registerAccountDTO.Roles,
                 Status = registerAccountDTO.Status ?? OperatingStatusEnum.inactive,
-                InfoStudentId = infoStudentId // 🔹 Gán InfoStudentId vào AccountModels
+                InfoStudentId = infoStudentId
             };
 
-            // 🔹 **Lưu tài khoản vào MongoDB**
             await _accounts.InsertOneAsync(account);
             ObjectId accountId = ObjectId.Parse(account.AccountId.ToString());
 
-            // 🔹 **Cập nhật AccountId vào InfoStudent**
             var update = Builders<InfoStudentModels>.Update.Set(x => x.AccountId, accountId);
             var filter = Builders<InfoStudentModels>.Filter.Eq(x => x.Id, infoStudentId);
             await _infoStudents.UpdateOneAsync(filter, update);
 
-            return Ok(new { message = "Registration successful", imageUrl = $"/images/{fileName}" });
+            return Ok(new { message = "Registration successful", imageUrl = uploadedImageUrl });
         }
 
+
         [Authorize(Roles = "Admin")]
-        [HttpPost("import-excel")]
-        public async Task<IActionResult> ImportFromExcel(IFormFile file)
+        [HttpPost("import-excel-with-images")]
+        public async Task<IActionResult> ImportFromExcelWithImages(IFormFile excelFile, IFormFileCollection imageFiles)
         {
-            if (file == null || file.Length == 0)
-                return BadRequest("No file uploaded");
+            if (excelFile == null || excelFile.Length == 0)
+                return BadRequest("No Excel file uploaded");
+
+            if (imageFiles == null || imageFiles.Count == 0)
+                return BadRequest("No image files uploaded");
 
             using var stream = new MemoryStream();
-            await file.CopyToAsync(stream);
+            await excelFile.CopyToAsync(stream);
             using var package = new ExcelPackage(stream);
             var worksheet = package.Workbook.Worksheets[0];
 
             var students = new List<StudentRequestDTO>();
-            var duplicateStudents = new List<int>(); // Danh sách lưu trữ số thứ tự của các sinh viên bị trùng
+            var duplicateStudents = new List<(int Row, StudentRequestDTO Student)>(); // Lưu cả row và object sinh viên
 
-            // Đọc từng dòng
             for (int row = 2; row <= worksheet.Dimension.End.Row; row++)
             {
                 var student = new StudentRequestDTO
@@ -425,58 +414,98 @@ namespace API_dormitory.Controllers
                         UserName = worksheet.Cells[row, 2].Text,
                         UserCode = worksheet.Cells[row, 3].Text,
                         NumberPhone = worksheet.Cells[row, 4].Text,
-                        Password = worksheet.Cells[row, 3].Text,  // Mật khẩu là mã sinh viên
-                        Roles = (int)RoleTypeStatusEnum.Student,  // Đặt trạng thái tài khoản là Student
-                        Status = (int)OperatingStatusEnum.active  // Đặt trạng thái tài khoản mặc định
+                        Password = worksheet.Cells[row, 3].Text,
+                        Roles = (int)RoleTypeStatusEnum.Student,
+                        Status = (int)OperatingStatusEnum.active
                     },
                     InfoStudent = new InfoStudentDTOs
                     {
                         Email = worksheet.Cells[row, 5].Text,
-                        Gender = worksheet.Cells[row, 6].Text.Trim().ToLower() == "Nam"
+                        Gender = worksheet.Cells[row, 6].Text.Trim().ToLower() == "nam"
                             ? GenderEnum.male
                             : GenderEnum.female,
                         NameParent = worksheet.Cells[row, 7].Text,
                         ParentNumberPhone = worksheet.Cells[row, 8].Text,
                         Address = worksheet.Cells[row, 9].Text,
+                        Picture = worksheet.Cells[row, 10].Text
                     }
                 };
 
-                // Kiểm tra xem số điện thoại hoặc UserName đã tồn tại trong MongoDB chưa
-                var existingUser = await _accounts.Find(x => x.NumberPhone == student.Account.NumberPhone).FirstOrDefaultAsync();
+                var existingUser = await _accounts.Find(x =>
+                    x.NumberPhone == student.Account.NumberPhone || x.UserName == student.Account.UserName
+                ).FirstOrDefaultAsync();
+
                 if (existingUser != null)
                 {
-                    // Nếu đã tồn tại, lưu số thứ tự vào danh sách duplicate
-                    duplicateStudents.Add(row); // row là số thứ tự của sinh viên trong Excel (bắt đầu từ 2)
-                    continue; // Bỏ qua sinh viên này
+                    duplicateStudents.Add((row, student));
+                    continue;
                 }
 
-                // Lấy ảnh tại vị trí tương ứng
-                var pic = worksheet.Drawings.OfType<ExcelPicture>()
-                           .FirstOrDefault(p => p.From.Row + 1 == row);
-                if (pic != null)
+                var imageFile = imageFiles.FirstOrDefault(f => f.FileName == student.InfoStudent.Picture);
+                if (imageFile != null)
                 {
-                    var imageBytes = pic.Image?.ImageBytes;
-                    student.InfoStudent.Picture = Convert.ToBase64String(imageBytes);  // Lưu ảnh dạng base64
+                    var uploadedImageUrl = await _cloudinaryService.UploadImageAsync(imageFile);
+                    student.InfoStudent.Picture = uploadedImageUrl;
+                }
+                else
+                {
+                    student.InfoStudent.Picture = "default_image_url";
                 }
 
                 students.Add(student);
             }
 
-            // Lưu vào MongoDB và tạo tài khoản sinh viên cho những sinh viên không bị trùng
             foreach (var stu in students)
             {
-                await Register(stu, null);  // Đoạn này gọi lại hàm Register bạn đã có
+                await Register(stu, null);
             }
 
-            // Kiểm tra nếu có sinh viên bị trùng
-            if (duplicateStudents.Count > 0)
+            if (duplicateStudents.Any())
             {
-                // In ra số lượng và số thứ tự của các sinh viên bị trùng
-                return Ok(new { message = "Import thành công, nhưng có tài khoản bị trùng", count = students.Count, duplicates = duplicateStudents });
+                // Tạo file Excel chứa danh sách bị trùng
+                using var resultPackage = new ExcelPackage();
+                var resultSheet = resultPackage.Workbook.Worksheets.Add("DuplicateStudents");
+
+                // Header
+                resultSheet.Cells[1, 1].Value = "UserName";
+                resultSheet.Cells[1, 2].Value = "UserCode";
+                resultSheet.Cells[1, 3].Value = "NumberPhone";
+                resultSheet.Cells[1, 4].Value = "Password";
+                resultSheet.Cells[1, 5].Value = "Email";
+                resultSheet.Cells[1, 6].Value = "Gender";
+                resultSheet.Cells[1, 7].Value = "NameParent";
+                resultSheet.Cells[1, 8].Value = "ParentNumberPhone";
+                resultSheet.Cells[1, 9].Value = "Address";
+                resultSheet.Cells[1, 10].Value = "Picture";
+
+                // Dữ liệu
+                int r = 2;
+                foreach (var dup in duplicateStudents)
+                {
+                    var s = dup.Student;
+                    resultSheet.Cells[r, 1].Value = s.Account.UserName;
+                    resultSheet.Cells[r, 2].Value = s.Account.UserCode;
+                    resultSheet.Cells[r, 3].Value = s.Account.NumberPhone;
+                    resultSheet.Cells[r, 4].Value = s.Account.Password;
+                    resultSheet.Cells[r, 5].Value = s.InfoStudent.Email;
+                    resultSheet.Cells[r, 6].Value = s.InfoStudent.Gender.ToString();
+                    resultSheet.Cells[r, 7].Value = s.InfoStudent.NameParent;
+                    resultSheet.Cells[r, 8].Value = s.InfoStudent.ParentNumberPhone;
+                    resultSheet.Cells[r, 9].Value = s.InfoStudent.Address;
+                    resultSheet.Cells[r, 10].Value = s.InfoStudent.Picture;
+                    r++;
+                }
+
+                var resultStream = new MemoryStream();
+                resultPackage.SaveAs(resultStream);
+                resultStream.Position = 0;
+
+                return File(resultStream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "DuplicateStudents.xlsx");
             }
 
             return Ok(new { message = "Import thành công!", count = students.Count });
         }
+
 
 
 

@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "zvaPxfjAOlOT7OEd6XMVWGYp7sxN/qIBanY7ocdz6pw=",
+  "Hash": "ILB6vz5y7IqSrTizq/ssIv9oU+ah+WFkyQ+cpN7hoIw=",
   "Source": "API_dormitory",
   "BasePath": "_content/API_dormitory",
   "Mode": "Default",
@@ -224,6 +224,25 @@
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot\\images\\89e2f2ca-6229-4dc5-838e-d601276ae979.jpg"
+    },
+    {
+      "Identity": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\avt.jpg",
+      "SourceId": "API_dormitory",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\",
+      "BasePath": "_content/API_dormitory",
+      "RelativePath": "images/avt.jpg",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\images\\avt.jpg"
     },
     {
       "Identity": "C:\\Users\\admin\\Documents\\Khoa_Luan\\Project\\API_Library\\API_Library\\wwwroot\\images\\b85bf556-9a13-45b8-b760-d5ba40bfebd1.png",
