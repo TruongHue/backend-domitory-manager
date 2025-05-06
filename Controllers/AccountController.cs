@@ -318,7 +318,6 @@ namespace API_dormitory.Controllers
 
       
 
-        [Authorize(Roles = "Admin,Student")]
         // 🔹 API đăng ký tài khoản sinh viên
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromForm] StudentRequestDTO registerRequest, IFormFile? file)
@@ -684,7 +683,7 @@ namespace API_dormitory.Controllers
             {
                 return BadRequest(new { message = "AccountId không hợp lệ!" });
             }
-
+             
             var result = await _accounts.DeleteOneAsync(acc => acc.AccountId == objectId);
 
             if (result.DeletedCount == 0)
