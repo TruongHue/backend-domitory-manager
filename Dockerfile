@@ -4,8 +4,8 @@ WORKDIR /app
 
 # Copy toàn bộ source code vào container và chạy restore
 COPY . . 
-RUN dotnet restore
 RUN dotnet publish -c Release -o /app/publish
+RUN dotnet list package
 
 # Sử dụng runtime .NET để chạy ứng dụng
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
