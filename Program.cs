@@ -13,8 +13,13 @@ ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 DotNetEnv.Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.Configure<CloudinarySettings>(
-    builder.Configuration.GetSection("CloudinarySettings"));
+builder.Services.Configure<CloudinarySettings>(options =>
+{
+    options.CloudName = Environment.GetEnvironmentVariable("CLOUDINARY_CLOUD_NAME");
+    options.ApiKey = Environment.GetEnvironmentVariable("CLOUDINARY_API_KEY");
+    options.ApiSecret = Environment.GetEnvironmentVariable("CLOUDINARY_API_SECRET");
+});
+
 
 builder.Services.AddScoped<CloudinaryService>();   // Đăng ký CloudinaryService
 builder.Services.AddSingleton<MongoDbContext>();   // Đăng ký MongoDbContext
