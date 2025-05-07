@@ -36,10 +36,20 @@ namespace API_dormitory.Services
             return result.SecureUrl.ToString(); // Trả URL để lưu vào DB
         }
 
-        internal async Task<string?> UploadImageAsync(byte[] imageBytes)
+        public async Task<string> UploadImageAsync(IFormFile file, string publicId)
         {
-            throw new NotImplementedException();
+            var uploadParams = new ImageUploadParams
+            {
+                File = new FileDescription(file.FileName, file.OpenReadStream()),
+                PublicId = publicId,
+                Overwrite = true,
+                Folder = "student-images" // có thể thay đổi tùy bạn cấu hình
+            };
+
+            var uploadResult = await _cloudinary.UploadAsync(uploadParams);
+            return uploadResult.SecureUrl.ToString();
         }
+
     }
 
 }

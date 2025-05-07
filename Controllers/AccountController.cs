@@ -23,6 +23,7 @@ using OfficeOpenXml.Drawing;
 using OfficeOpenXml;
 using Microsoft.AspNetCore.Authorization;
 using API_dormitory.Services;
+using static System.Net.WebRequestMethods;
 
 
 namespace API_dormitory.Controllers
@@ -387,23 +388,12 @@ namespace API_dormitory.Controllers
         }
 
 
-        [Authorize(Roles = "Admin")]
+        /*[Authorize(Roles = "Admin")]*/
         [HttpPost("import-excel-with-images")]
         public async Task<IActionResult> ImportFromExcelWithImages(IFormFile excelFile, IFormFileCollection imageFiles)
         {
             if (excelFile == null || excelFile.Length == 0)
                 return BadRequest("No Excel file uploaded");
-
-            // 🔹 Upload tất cả ảnh trước và lưu lại đường dẫn
-            var imageLinks = new Dictionary<string, string>();
-            foreach (var img in imageFiles)
-            {
-                if (img.Length > 0)
-                {
-                    var link = await _cloudinaryService.UploadImageAsync(img);
-                    imageLinks[img.FileName] = link;
-                }
-            }
 
             using var stream = new MemoryStream();
             await excelFile.CopyToAsync(stream);
@@ -413,18 +403,26 @@ namespace API_dormitory.Controllers
             var students = new List<StudentRequestDTO>();
             var duplicateStudents = new List<(int Row, StudentRequestDTO Student)>();
 
+            // ✅ Upload toàn bộ ảnh, không cần map gì cả
+            foreach (var imageFile in imageFiles)
+            {
+                var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(imageFile.FileName);
+                await _cloudinaryService.UploadImageAsync(imageFile, fileNameWithoutExtension);
+            }
+
             for (int row = 2; row <= worksheet.Dimension.End.Row; row++)
             {
-                var pictureName = worksheet.Cells[row, 10].Text;
+                var pictureFileName = worksheet.Cells[row, 10].Text?.Trim();
+                var uploadedPictureUrl = $"https://res.cloudinary.com/dx39lepss/image/upload/v1746577647/student-images/{pictureFileName}";
 
                 var student = new StudentRequestDTO
                 {
                     Account = new AccountDTOs
                     {
-                        UserName = worksheet.Cells[row, 2].Text,
-                        UserCode = worksheet.Cells[row, 3].Text,
-                        NumberPhone = worksheet.Cells[row, 4].Text,
-                        Password = worksheet.Cells[row, 3].Text,
+                        UserName = worksheet.Cells[row, 1].Text,
+                        UserCode = worksheet.Cells[row, 2].Text,
+                        NumberPhone = worksheet.Cells[row, 3].Text,
+                        Password = worksheet.Cells[row, 4].Text,
                         Roles = (int)RoleTypeStatusEnum.Student,
                         Status = (int)OperatingStatusEnum.active
                     },
@@ -437,11 +435,14 @@ namespace API_dormitory.Controllers
                         NameParent = worksheet.Cells[row, 7].Text,
                         ParentNumberPhone = worksheet.Cells[row, 8].Text,
                         Address = worksheet.Cells[row, 9].Text,
-                        Picture = imageLinks.ContainsKey(pictureName) ? imageLinks[pictureName] : "default_image_url"
+                        Picture = uploadedPictureUrl
                     }
-                };
 
-                var existingUser = await _accounts.Find(x =>
+
+                };
+            Console.WriteLine($"Student Picture: {student.InfoStudent.Picture}");
+
+            var existingUser = await _accounts.Find(x =>
                     x.NumberPhone == student.Account.NumberPhone || x.UserName == student.Account.UserName
                 ).FirstOrDefaultAsync();
 
@@ -456,7 +457,7 @@ namespace API_dormitory.Controllers
 
             foreach (var stu in students)
             {
-                await Register(stu, null); // Đã có link ảnh rồi nên không cần IFormFile
+                await AddStudentToDatabase(stu);
             }
 
             if (duplicateStudents.Any())
@@ -502,6 +503,46 @@ namespace API_dormitory.Controllers
             return Ok(new { message = "Import thành công!", count = students.Count });
         }
 
+
+        private async Task AddStudentToDatabase(StudentRequestDTO student)
+        {
+            // Tạo đối tượng InfoStudentDTO từ dữ liệu sinh viên
+            var infoStudent = new InfoStudentModels
+            {
+                Email = student.InfoStudent.Email,
+                Gender = student.InfoStudent.Gender,
+                NameParent = student.InfoStudent.NameParent,
+                ParentNumberPhone = student.InfoStudent.ParentNumberPhone,
+                Address = student.InfoStudent.Address,
+                Picture = student.InfoStudent.Picture // Lưu link ảnh nếu có
+            };
+
+            //} Thêm thông tin sinh viên vào cơ sở dữ liệu
+            await _infoStudents.InsertOneAsync(infoStudent);
+            ObjectId infoStudentId = ObjectId.Parse(infoStudent.Id.ToString()); // Lấy ID của sinh viên sau khi insert
+
+            // Tạo đối tượng AccountDTO từ dữ liệu tài khoản sinh viên
+            var account = new AccountModels
+            {
+                UserName = student.Account.UserName,
+                UserCode = student.Account.UserCode,
+                NumberPhone = student.Account.NumberPhone,
+                Password = HashPassword(student.Account.Password), // Đảm bảo mật khẩu được mã hóa
+                Roles = (RoleTypeStatusEnum)student.Account.Roles,
+                Status = student.Account.Status ?? OperatingStatusEnum.inactive,
+                InfoStudentId = infoStudentId // Liên kết tài khoản với thông tin sinh viên
+            };
+
+            // Thêm thông tin tài khoản vào cơ sở dữ liệu
+            await _accounts.InsertOneAsync(account);
+            ObjectId accountId = ObjectId.Parse(account.AccountId.ToString()); // Lấy ID tài khoản sau khi insert
+
+            // Cập nhật lại thông tin tài khoản cho sinh viên trong bảng InfoStudent
+            var update = Builders<InfoStudentModels>.Update.Set(x => x.AccountId, accountId);
+            var filter = Builders<InfoStudentModels>.Filter.Eq(x => x.Id, infoStudentId);
+            await _infoStudents.UpdateOneAsync(filter, update);
+
+        }
 
         //Đăng nhập
         [HttpPost("login")]
