@@ -193,8 +193,16 @@ namespace API_dormitory.Controllers
                             studentInfo.Email,
                             studentName,
                             "Thông báo thanh toán thành công",
-                            $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Phòng của bạn đã được thanh toán thành công. Chúc bạn có thời gian học tập thoải mái tại ký túc xá.</p><p>Trân trọng.</p>"
-                        );
+                            $@"
+                            <p>Xin chào <strong>{studentName}</strong>,</p>
+
+                            <p>Phòng của bạn đã được thanh toán thành công.</p>
+
+                            <p>Chúc bạn có khoảng thời gian học tập và sinh hoạt thật thoải mái tại Ký túc xá.</p>
+
+                            <p>Trân trọng,<br/>Ban Quản lý Ký túc xá</p>
+                            "
+                            );
                     }
                     catch (Exception ex)
                     {
@@ -218,7 +226,17 @@ namespace API_dormitory.Controllers
                                   studentInfo.Email,
                 studentName,
                                 "Thông báo thanh toán trước ngày hết hạn",
-                                $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Bạn vui lòng thanh toán phí - phòng trước ngày bất đầu!</p><p>Trân trọng.</p>"
+                                $@"
+                                    <p>Xin chào <strong>{studentName}</strong>,</p>
+
+                                    <p>Phòng Quản lý Ký túc xá xin thông báo đến bạn về việc thanh toán phí phòng.</p>
+
+                                    <p>Vui lòng hoàn tất việc thanh toán trước ngày bắt đầu thời gian ở để đảm bảo quyền lợi và tránh gián đoạn trong quá trình đăng ký.</p>
+
+                                    <p>Trân trọng cảm ơn bạn đã hợp tác.</p>
+
+                                    <p>Trân trọng,<br/>Ban Quản lý Ký túc xá</p>
+                                "
                             );
                         }
                         catch (Exception ex)
@@ -277,18 +295,39 @@ namespace API_dormitory.Controllers
                 switch (newPaymentStatus.statusPayment)
                 {
                     case PaymentStatusEnum.paid:
-                        subject = "Thông báo thanh toán thành công";
-                        body = $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Phòng của bạn đã được thanh toán thành công. Chúc bạn có thời gian học tập thoải mái tại ký túc xá.</p><p>Trân trọng.</p>";
+                        subject = "Xác nhận thanh toán thành công";
+                        body = $@"
+                            <p>Xin chào <strong>{studentName}</strong>,</p>
+
+                            <p>Phòng Quản lý Ký túc xá xin thông báo rằng bạn đã hoàn tất thanh toán phòng thành công.</p>
+
+                            <p>Chúc bạn có một khoảng thời gian học tập và sinh hoạt thật thoải mái tại Ký túc xá.</p>
+
+                            <p>Trân trọng,<br/>Ban Quản lý Ký túc xá</p>";
                         break;
 
                     case PaymentStatusEnum.unpaid:
                         subject = "Nhắc nhở thanh toán tiền phòng";
-                        body = $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Hệ thống ghi nhận bạn chưa thanh toán tiền phòng. Vui lòng thực hiện thanh toán sớm để tránh ảnh hưởng đến quyền lợi đăng ký phòng.</p><p>Trân trọng.</p>";
+                        body = $@"
+                            <p>Xin chào <strong>{studentName}</strong>,</p>
+
+                            <p>Hệ thống ghi nhận bạn vẫn chưa hoàn tất thanh toán tiền phòng.</p>
+
+                            <p>Vui lòng thực hiện thanh toán trước thời hạn để đảm bảo quyền lợi lưu trú và tránh gián đoạn trong việc đăng ký.</p>
+
+                            <p>Trân trọng,<br/>Ban Quản lý Ký túc xá</p>";
                         break;
 
                     case PaymentStatusEnum.cancel:
-                        subject = "Thông báo huỷ thanh toán đăng ký phòng";
-                        body = $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Đăng ký phòng của bạn đã bị huỷ do không thanh toán đúng hạn hoặc theo yêu cầu. Vui lòng liên hệ ban quản lý để biết thêm chi tiết.</p><p>Trân trọng.</p>";
+                        subject = "Thông báo huỷ đăng ký phòng";
+                        body = $@"
+                            <p>Xin chào <strong>{studentName}</strong>,</p>
+
+                            <p>Rất tiếc, đăng ký phòng của bạn đã bị huỷ do không hoàn tất thanh toán đúng thời hạn hoặc theo yêu cầu.</p>
+
+                            <p>Nếu bạn có bất kỳ thắc mắc nào, vui lòng liên hệ Ban Quản lý Ký túc xá để được hỗ trợ thêm.</p>
+
+                            <p>Trân trọng,<br/>Ban Quản lý Ký túc xá</p>";
                         break;
                 }
 
@@ -339,22 +378,50 @@ namespace API_dormitory.Controllers
                 {
                     case OperatingStatusEnum.active:
                         subject = "Thông báo kích hoạt đăng ký phòng";
-                        body = $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Đăng ký phòng của bạn đã được kích hoạt thành công.</p><p>Chúc bạn có thời gian học tập thoải mái tại ký túc xá!</p><p>Trân trọng.</p>";
+                        body = $@"
+                            <p>Xin chào <strong>{studentName}</strong>,</p>
+
+                            <p>Đăng ký phòng của bạn đã được <strong>kích hoạt thành công</strong>.</p>
+
+                            <p>Chúc bạn có khoảng thời gian học tập và sinh hoạt thật thuận lợi tại Ký túc xá.</p>
+
+                            <p>Trân trọng,<br/>Ban Quản lý Ký túc xá</p>";
                         break;
 
                     case OperatingStatusEnum.blocked:
-                        subject = "Thông báo hủy đăng ký phòng";
-                        body = $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Đăng ký phòng của bạn đã bị hủy hoặc chặn. Vui lòng liên hệ ban quản lý để biết thêm chi tiết.</p><p>Trân trọng.</p>";
+                        subject = "Thông báo huỷ đăng ký phòng";
+                        body = $@"
+                            <p>Xin chào <strong>{studentName}</strong>,</p>
+
+                            <p>Đăng ký phòng của bạn đã bị <strong>huỷ hoặc chặn</strong>. Nguyên nhân có thể do vi phạm quy định hoặc không đáp ứng điều kiện lưu trú.</p>
+
+                            <p>Vui lòng liên hệ Ban Quản lý Ký túc xá để được hỗ trợ thêm.</p>
+
+                            <p>Trân trọng,<br/>Ban Quản lý Ký túc xá</p>";
                         break;
 
                     case OperatingStatusEnum.inactive:
                         subject = "Thông báo tạm ngưng đăng ký phòng";
-                        body = $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Trạng thái đăng ký phòng của bạn đã chuyển sang tạm ngưng. Vui lòng kiểm tra lại hoặc liên hệ hỗ trợ.</p><p>Trân trọng.</p>";
+                        body = $@"
+                            <p>Xin chào <strong>{studentName}</strong>,</p>
+
+                            <p>Trạng thái đăng ký phòng của bạn hiện đang <strong>tạm ngưng</strong>.</p>
+
+                            <p>Vui lòng kiểm tra lại thông tin cá nhân hoặc liên hệ bộ phận quản lý để được giải đáp.</p>
+
+                            <p>Trân trọng,<br/>Ban Quản lý Ký túc xá</p>";
                         break;
 
                     case OperatingStatusEnum.wait:
                         subject = "Thông báo chờ duyệt đăng ký phòng";
-                        body = $"<p>Xin chào <strong>{studentName}</strong>,</p><p>Đăng ký phòng của bạn đang được xét duyệt. Vui lòng chờ phản hồi từ ban quản lý ký túc xá.</p><p>Trân trọng.</p>";
+                        body = $@"
+                            <p>Xin chào <strong>{studentName}</strong>,</p>
+
+                            <p>Hệ thống ghi nhận bạn đã gửi yêu cầu đăng ký phòng. Hiện trạng thái đăng ký đang <strong>chờ xét duyệt</strong>.</p>
+
+                            <p>Vui lòng theo dõi email hoặc liên hệ Ban Quản lý để biết thêm thông tin.</p>
+
+                            <p>Trân trọng,<br/>Ban Quản lý Ký túc xá</p>";
                         break;
                 }
 

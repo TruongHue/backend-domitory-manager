@@ -383,12 +383,25 @@ namespace API_dormitory.Controllers
             var update = Builders<InfoStudentModels>.Update.Set(x => x.AccountId, accountId);
             var filter = Builders<InfoStudentModels>.Filter.Eq(x => x.Id, infoStudentId);
             await _infoStudents.UpdateOneAsync(filter, update);
+            // Gửi email thông báo chờ xét duyệt
+            await _emailService.SendEmailAsync(
+                registerInfoUserDTO.Email,
+                registerAccountDTO.UserName ?? "Sinh viên", // fallback nếu tên null
+                "Thông báo chờ duyệt đăng ký phòng",
+                $@"<p>Xin chào <strong>{registerAccountDTO.UserName}</strong>,</p>
+
+                <p>Hệ thống đã ghi nhận thông tin đăng ký của bạn.</p>
+
+                <p>Hiện tại, đăng ký đang <strong>chờ xét duyệt</strong>. Vui lòng theo dõi email để nhận kết quả sớm nhất.</p>
+
+                <p>Trân trọng,<br/>Ban Quản lý Ký túc xá</p>"
+            );
 
             return Ok(new { message = "Registration successful", imageUrl = uploadedImageUrl });
         }
 
 
-        /*[Authorize(Roles = "Admin")]*/
+        [Authorize(Roles = "Admin")]
         [HttpPost("import-excel-with-images")]
         public async Task<IActionResult> ImportFromExcelWithImages(IFormFile excelFile, IFormFileCollection imageFiles)
         {

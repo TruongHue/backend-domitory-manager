@@ -660,7 +660,16 @@ namespace API_dormitory.Controllers
                         var name = updateDto.StudentName ?? "một thành viên trong phòng";
                         var code = updateDto.StudentCode ?? "";
                         var subject = "Thông báo thanh toán hóa đơn điện";
-                        var body = $"<p>Xin chào,</p><p>Hóa đơn điện của phòng bạn đã được thanh toán bởi <strong>{name}</strong> ({code}).</p><p>Trân trọng.</p>";
+
+                        var body = $@"
+                            <p>Xin chào,</p>
+
+                            <p>Hóa đơn tiền điện của phòng bạn đã được <strong>thanh toán thành công</strong> bởi sinh viên <strong>{name}</strong> (MSSV: {code}).</p>
+
+                            <p>Vui lòng kiểm tra lại trong hệ thống nếu cần xác nhận thông tin chi tiết.</p>
+
+                            <p>Trân trọng,<br/>Ban Quản lý Ký túc xá</p>";
+
 
                         try
                         {
@@ -733,8 +742,16 @@ namespace API_dormitory.Controllers
                     {
                         var name = updateDto.StudentName ?? "một thành viên trong phòng";
                         var code = updateDto.StudentCode ?? "";
-                        var subject = "Thông báo thanh toán hóa đơn nước";
-                        var body = $"<p>Xin chào,</p><p>Hóa đơn nước của phòng bạn đã được thanh toán bởi <strong>{name}</strong> ({code}).</p><p>Trân trọng.</p>";
+                        var subject = "Thông báo thanh toán hóa đơn điện";
+
+                        var body = $@"
+                            <p>Xin chào,</p>
+
+                            <p>Hóa đơn tiền nước của phòng bạn đã được <strong>thanh toán thành công</strong> bởi sinh viên <strong>{name}</strong> (MSSV: {code}).</p>
+
+                            <p>Vui lòng kiểm tra lại trong hệ thống nếu cần xác nhận thông tin chi tiết.</p>
+
+                            <p>Trân trọng,<br/>Ban Quản lý Ký túc xá</p>";
 
                         try
                         {
