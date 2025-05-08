@@ -615,7 +615,9 @@ namespace API_dormitory.Controllers
                 {
             new Claim(ClaimTypes.NameIdentifier, user.AccountId.ToString()),
             new Claim(ClaimTypes.Name, user.UserName),
-            new Claim(ClaimTypes.Role, Enum.GetName(typeof(RoleTypeStatusEnum), user.Roles))
+            new Claim(ClaimTypes.Role, Enum.GetName(typeof(RoleTypeStatusEnum), user.Roles)),
+                        new Claim("id", user.AccountId.ToString()) // Thêm 'id' vào trong token
+
                 }),
                 Expires = DateTime.UtcNow.AddHours(6), // Token có thời hạn 6 giờ
                 Issuer = _configuration["Jwt:Issuer"],     // ✅ thêm dòng này
@@ -770,6 +772,69 @@ namespace API_dormitory.Controllers
 
             return Ok(new { message = "Xóa tài khoản thành công!" });
         }
+
+        [Authorize(Roles = "Student")]
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDTO model)
+        {
+            if (model == null || string.IsNullOrEmpty(model.OldPassword) || string.IsNullOrEmpty(model.NewPassword))
+            {
+                return BadRequest(new { message = "Vui lòng nhập đầy đủ mật khẩu cũ và mới." });
+            }
+
+            var userId = User.FindFirst("id")?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized(new { message = "Không xác định được người dùng." });
+            }
+
+            var account = await _accounts.Find(x => x.AccountId == ObjectId.Parse(userId)).FirstOrDefaultAsync();
+            if (account == null)
+            {
+                return NotFound(new { message = "Tài khoản không tồn tại." });
+            }
+
+            // So sánh mật khẩu cũ
+            if (!VerifyPassword(model.OldPassword, account.Password))
+            {
+                return BadRequest(new { message = "Mật khẩu cũ không đúng." });
+            }
+
+            // Cập nhật mật khẩu mới
+            var hashedNewPassword = HashPassword(model.NewPassword);
+            var update = Builders<AccountModels>.Update.Set(x => x.Password, hashedNewPassword);
+            await _accounts.UpdateOneAsync(x => x.AccountId == account.AccountId, update);
+
+            return Ok(new { message = "Đổi mật khẩu thành công." });
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDTO model)
+        {
+            if (model == null || string.IsNullOrEmpty(model.AccountId) || string.IsNullOrEmpty(model.NewPassword))
+            {
+                return BadRequest(new { message = "Vui lòng cung cấp AccountId và mật khẩu mới." });
+            }
+
+            if (!ObjectId.TryParse(model.AccountId, out ObjectId accountId))
+            {
+                return BadRequest(new { message = "AccountId không hợp lệ." });
+            }
+
+            var account = await _accounts.Find(x => x.AccountId == accountId).FirstOrDefaultAsync();
+            if (account == null)
+            {
+                return NotFound(new { message = "Tài khoản không tồn tại." });
+            }
+
+            var hashedPassword = HashPassword(model.NewPassword);
+            var update = Builders<AccountModels>.Update.Set(x => x.Password, hashedPassword);
+            await _accounts.UpdateOneAsync(x => x.AccountId == accountId, update);
+
+            return Ok(new { message = "Đặt lại mật khẩu thành công." });
+        }
+
 
     }
 

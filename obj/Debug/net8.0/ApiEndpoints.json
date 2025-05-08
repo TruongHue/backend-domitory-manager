@@ -110,6 +110,22 @@
   },
   {
     "ContainingType": "API_dormitory.Controllers.AccountController",
+    "Method": "ChangePassword",
+    "RelativePath": "api/Account/change-password",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "model",
+        "Type": "API_dormitory.Models.DTO.Account.ChangePasswordDTO",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "API_dormitory.Controllers.AccountController",
     "Method": "DeleteAccount",
     "RelativePath": "api/Account/delete-account/{accountId}",
     "HttpMethod": "DELETE",
@@ -258,6 +274,22 @@
         "Name": "file",
         "Type": "Microsoft.AspNetCore.Http.IFormFile",
         "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "API_dormitory.Controllers.AccountController",
+    "Method": "ResetPassword",
+    "RelativePath": "api/Account/reset-password",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "model",
+        "Type": "API_dormitory.Models.DTO.Account.ResetPasswordDTO",
+        "IsRequired": true
       }
     ],
     "ReturnTypes": []
