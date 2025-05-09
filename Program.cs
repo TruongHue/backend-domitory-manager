@@ -22,7 +22,15 @@ builder.Services.Configure<CloudinarySettings>(options =>
 
 
 builder.Services.AddScoped<CloudinaryService>();   // Đăng ký CloudinaryService
-builder.Services.AddSingleton<MongoDbContext>();   // Đăng ký MongoDbContext
+builder.Services.AddSingleton<MongoDbContext>(); // Đăng ký MongoDbContext
+builder.Services.AddSingleton<IMongoClient>(sp =>
+{
+    // Lấy chuỗi kết nối từ cấu hình
+    var config = sp.GetRequiredService<IConfiguration>();
+    var connectionString = config["MongoDB:ConnectionString"];
+
+    return new MongoClient(connectionString); // Truyền vào cho những class nào cần IMongoClient trực tiếp
+});
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
