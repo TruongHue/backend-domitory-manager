@@ -812,9 +812,9 @@ namespace API_dormitory.Controllers
         [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDTO model)
         {
-            if (model == null || string.IsNullOrEmpty(model.AccountId) || string.IsNullOrEmpty(model.NewPassword))
+            if (model == null || string.IsNullOrEmpty(model.AccountId))
             {
-                return BadRequest(new { message = "Vui lòng cung cấp AccountId và mật khẩu mới." });
+                return BadRequest(new { message = "Vui lòng cung cấp AccountId." });
             }
 
             if (!ObjectId.TryParse(model.AccountId, out ObjectId accountId))
@@ -828,12 +828,16 @@ namespace API_dormitory.Controllers
                 return NotFound(new { message = "Tài khoản không tồn tại." });
             }
 
-            var hashedPassword = HashPassword(model.NewPassword);
+            // Dùng UserCode làm mật khẩu mới
+            var newPassword = account.UserCode;
+            var hashedPassword = HashPassword(newPassword);
+
             var update = Builders<AccountModels>.Update.Set(x => x.Password, hashedPassword);
             await _accounts.UpdateOneAsync(x => x.AccountId == accountId, update);
 
-            return Ok(new { message = "Đặt lại mật khẩu thành công." });
+            return Ok(new { message = $"Đặt lại mật khẩu thành công. Mật khẩu mới là: {newPassword}" });
         }
+
 
 
     }
