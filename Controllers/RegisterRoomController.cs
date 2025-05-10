@@ -147,9 +147,9 @@ namespace API_dormitory.Controllers
                 {
                     // Kiểm tra sinh viên đã đăng ký 'active' chưa
                     var existingRegister = await _registerRoomCollection
-                        .Find(r => r.IdStudent == studentId && r.Status == OperatingStatusEnum.active)
+                        .Find(r => r.IdStudent == studentId &&
+                                   (r.Status == OperatingStatusEnum.active || r.Status == OperatingStatusEnum.wait))
                         .FirstOrDefaultAsync();
-
                     // Lấy thông tin phòng
                     var room = await _roomsCollection.Find(r => r.IdRoom == roomId).FirstOrDefaultAsync();
                     if (room == null)
@@ -253,9 +253,6 @@ namespace API_dormitory.Controllers
                 }
             }
         }
-
-
-
 
 
         [Authorize(Roles = "Admin")]
