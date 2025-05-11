@@ -952,6 +952,16 @@
   },
   {
     "ContainingType": "API_dormitory.Controllers.RegisterRoomController",
+    "Method": "GetStudentCountByRegistrationPeriod",
+    "RelativePath": "api/RegisterRoom/count-by-registration-period",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "API_dormitory.Controllers.RegisterRoomController",
     "Method": "DeleteRegisterRoom",
     "RelativePath": "api/RegisterRoom/delete-register/{idRegister}",
     "HttpMethod": "DELETE",

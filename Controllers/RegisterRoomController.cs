@@ -122,6 +122,26 @@ namespace API_dormitory.Controllers
 
             return Ok(result);
         }
+/*        [Authorize(Roles = "Admin")]
+*/        [HttpGet("count-by-registration-period")]
+        public async Task<IActionResult> GetStudentCountByRegistrationPeriod()
+        {
+            var registerRooms = await _registerRoomCollection.Find(_ => true).ToListAsync();
+
+            if (registerRooms == null || registerRooms.Count == 0)
+                return NotFound(new { message = "Không có dữ liệu đăng ký phòng." });
+
+            var grouped = registerRooms
+                .GroupBy(r => r.IdRegistrationPeriod)
+                .Select(g => new
+                {
+                    IdRegistrationPeriod = g.Key.ToString(),
+                    StudentCount = g.Select(x => x.IdStudent).Distinct().Count()
+                })
+                .ToList();
+
+            return Ok(grouped);
+        }
 
         [Authorize(Roles = "Admin,Student")]
         [HttpPost]
