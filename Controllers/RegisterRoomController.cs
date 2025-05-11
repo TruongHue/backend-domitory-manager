@@ -122,8 +122,8 @@ namespace API_dormitory.Controllers
 
             return Ok(result);
         }
-        /*        [Authorize(Roles = "Admin")]
-        */
+        [Authorize(Roles = "Admin")]
+
         [HttpGet("count-by-registration-period")]
         public async Task<IActionResult> GetStudentCountByRegistrationPeriod()
         {
