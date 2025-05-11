@@ -63,7 +63,6 @@ namespace API_dormitory.Controllers
                                                               && acc.Roles == RoleTypeStatusEnum.Student);
                 return account != null ? new
                 {
-                    // Hiển thị thông tin tài khoản trước
                     Account = new
                     {
                         AccountId = account.AccountId.ToString(),
@@ -73,8 +72,6 @@ namespace API_dormitory.Controllers
                         account.Roles,
                         account.Status
                     },
-
-                    // Sau đó hiển thị thông tin sinh viên
                     InfoStudent = new
                     {
                         Id = student.Id.ToString(),
@@ -87,7 +84,8 @@ namespace API_dormitory.Controllers
                     }
                 } : null;
             })
-            .Where(result => result != null) // Loại bỏ student không có tài khoản hợp lệ
+            .Where(result => result != null)
+            .Reverse() // Đảo ngược thứ tự danh sách
             .ToList();
 
             if (!result.Any())
@@ -97,6 +95,7 @@ namespace API_dormitory.Controllers
 
             return Ok(result);
         }
+
 
         //Có dùng
         [Authorize(Roles = "Admin")]
@@ -138,6 +137,7 @@ namespace API_dormitory.Controllers
                 } : null;
             })
             .Where(result => result != null) // Loại bỏ student không có tài khoản hợp lệ
+            .Reverse()
             .ToList();
 
             if (!result.Any())
@@ -188,6 +188,7 @@ namespace API_dormitory.Controllers
                 } : null;
             })
             .Where(result => result != null) // Loại bỏ student không có tài khoản hợp lệ
+            .Reverse()
             .ToList();
 
             if (!result.Any())
@@ -238,6 +239,7 @@ namespace API_dormitory.Controllers
                 } : null;
             })
             .Where(result => result != null) // Loại bỏ student không có tài khoản hợp lệ
+            .Reverse()
             .ToList();
 
             if (!result.Any())
