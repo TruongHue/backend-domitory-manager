@@ -122,8 +122,9 @@ namespace API_dormitory.Controllers
 
             return Ok(result);
         }
-/*        [Authorize(Roles = "Admin")]
-*/        [HttpGet("count-by-registration-period")]
+        /*        [Authorize(Roles = "Admin")]
+        */
+        [HttpGet("count-by-registration-period")]
         public async Task<IActionResult> GetStudentCountByRegistrationPeriod()
         {
             var registerRooms = await _registerRoomCollection.Find(_ => true).ToListAsync();
@@ -136,12 +137,15 @@ namespace API_dormitory.Controllers
                 .Select(g => new
                 {
                     IdRegistrationPeriod = g.Key.ToString(),
+                    StartDate = g.FirstOrDefault()?.StartDate,  // Giả sử có trường StartDate
+                    EndDate = g.FirstOrDefault()?.EndDate,    // Giả sử có trường EndDate
                     StudentCount = g.Select(x => x.IdStudent).Distinct().Count()
                 })
                 .ToList();
 
             return Ok(grouped);
         }
+
 
         [Authorize(Roles = "Admin,Student")]
         [HttpPost]
