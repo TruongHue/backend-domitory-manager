@@ -279,7 +279,7 @@ namespace API_dormitory.Controllers
         }
 
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Student")]
         [HttpPut("update-payment-status/{idRegister}")]
         public async Task<IActionResult> UpdatePaymentStatus(string idRegister, [FromBody] UpdateStatusPaymentDTO newPaymentStatus)
         {
