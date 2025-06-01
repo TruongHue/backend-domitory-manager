@@ -377,7 +377,7 @@ namespace API_dormitory.Controllers
             return Ok(new { message = "Cập nhật trạng thái thanh toán thành công!" });
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Student")]
         [HttpPut("update-status/{idRegister}")]
         public async Task<IActionResult> UpdateOperatingStatus(string idRegister, [FromBody] UpdateStatusDTO newStatus)
         {
