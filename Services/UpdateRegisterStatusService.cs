@@ -22,10 +22,37 @@ namespace API_dormitory.Services
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                await UpdateRegisterStatus();
-                await Task.Delay(TimeSpan.FromHours(24), stoppingToken); // Chạy mỗi 24 giờ
+                try
+                {
+                    await UpdateRegisterStatus();
+
+                    // Giờ hiện tại theo giờ Việt Nam (UTC+7)
+                    var nowUtc = DateTime.UtcNow;
+                    var nowVietnam = nowUtc.AddHours(7);
+
+                    // Tính thời điểm 00:00 ngày hôm sau (giờ Việt Nam)
+                    var nextMidnightVietnam = nowVietnam.Date.AddDays(1);
+
+                    // Tính khoảng thời gian cần delay
+                    var delayVietnam = nextMidnightVietnam - nowVietnam;
+
+                    Console.WriteLine($"🕛 Đợi đến {nextMidnightVietnam} giờ Việt Nam để chạy lại (sau {delayVietnam.TotalMinutes:F0} phút)");
+
+                    await Task.Delay(delayVietnam, stoppingToken);
+                }
+                catch (TaskCanceledException)
+                {
+                    // Bỏ qua nếu task bị huỷ khi shutdown app
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Lỗi trong UpdateRegisterStatusService: {ex.Message}");
+                    // Có thể log thêm nếu muốn
+                    await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken); // chờ 1 phút rồi thử lại
+                }
             }
         }
+
 
         private async Task UpdateRegisterStatus()
         {
