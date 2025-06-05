@@ -1,6 +1,7 @@
 ﻿using API_dormitory.Data;
 using API_dormitory.Models.common;
 using API_dormitory.Models.DTO.RegisterRoom;
+using API_dormitory.Models.registerRoom;
 using API_dormitory.Models.Registrations;
 using API_dormitory.Models.Rooms;
 using Microsoft.AspNetCore.Authorization;
@@ -18,10 +19,14 @@ namespace API_dormitory.Controllers
     public class RegistrationPeriodController : ControllerBase
     {
         private readonly IMongoCollection<RegistrationPeriodModels> _registrationPeriods;
+        private readonly IMongoCollection<RegisterRoomModels> _registerRoomCollection;
+
 
         public RegistrationPeriodController(MongoDbContext mongoContext)
         {
             _registrationPeriods = mongoContext.GetCollection<RegistrationPeriodModels>("RegistrationPeriods");
+            _registerRoomCollection = mongoContext.GetCollection<RegisterRoomModels>("RegisterRoom");
+
         }
 
         // Lấy tất cả kỳ đăng ký
@@ -85,12 +90,27 @@ namespace API_dormitory.Controllers
             return Ok(new { message = "Thêm mới kỳ đăng ký thành công!"});
         }
 
-        // Xóa kỳ đăng ký
         [Authorize(Roles = "Admin")]
         [HttpDelete("delete-registration-period/{id}")]
         public async Task<IActionResult> DeleteRegistrationPeriod(string id)
         {
+            if (!ObjectId.TryParse(id, out var objectId))
+            {
+                return BadRequest(new { message = "ID không hợp lệ." });
+            }
+
+            // 🔍 Kiểm tra xem có đăng ký nào đang sử dụng kỳ này không
+            var isUsed = await _registerRoomCollection
+                .Find(r => r.IdRegistrationPeriod == objectId)
+                .AnyAsync();
+
+            if (isUsed)
+            {
+                return BadRequest(new { message = "Không thể xóa kỳ đăng ký vì đã có sinh viên đăng ký trong kỳ này." });
+            }
+
             var result = await _registrationPeriods.DeleteOneAsync(rp => rp.Id == id);
+
             if (result.DeletedCount == 0)
             {
                 return NotFound(new { message = $"Không tìm thấy kỳ đăng ký có ID {id}." });

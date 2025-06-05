@@ -21,8 +21,7 @@ namespace API_dormitory.Controllers
     public class RegisterRoomController : ControllerBase
     {
         private readonly IMongoCollection<RegisterRoomModels> _registerRoomCollection;
-        private readonly IMongoCollection<RoomBillModels> _roomBillCollection;
-        private readonly IMongoCollection<PriceWaterAndElectricity> _priceCollection;
+
         private readonly IMongoCollection<InfoRoomModels> _roomsCollection;
         private readonly IMongoCollection<BuildingModels> _buildingsCollection;
         private readonly IMongoCollection<AccountModels> _accounts;
@@ -36,7 +35,6 @@ namespace API_dormitory.Controllers
         public RegisterRoomController(MongoDbContext database, IMongoClient mongoClient, EmailService emailService)
         {
             _registerRoomCollection = database.GetCollection<RegisterRoomModels>("RegisterRoom");
-            _roomBillCollection = database.GetCollection<RoomBillModels>("RoomBills");
             _roomsCollection = database.GetCollection<InfoRoomModels>("Rooms");
             _buildingsCollection = database.GetCollection<BuildingModels>("Buildings");
             _accounts = database.GetCollection<AccountModels>("Accounts");
